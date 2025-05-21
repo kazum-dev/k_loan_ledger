@@ -1,6 +1,6 @@
-from modules.customer_module import *
-from modules.loan_module import register_loan,display_loan_history, register_repayment
-from modules.customer_module import get_credit_limit
+from modules.customer_module import list_customers, search_customer, get_all_customer_ids, get_credit_limit
+from modules.loan_module import register_loan,display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans
+from modules.balance_module import display_balance
 from datetime import datetime
 
 def loan_registration_mode():
@@ -18,7 +18,7 @@ def loan_registration_mode():
         customer_id_input = "CUST" + customer_id_input.zfill(3)
 
     customer_id = customer_id_input
-    valid_ids =get_all_customer_ids()
+    valid_ids = get_all_customer_ids()
 
     if customer_id not in valid_ids:
         print("❌ 顧客IDが存在しません。先に顧客登録を行ってください。")
@@ -36,6 +36,7 @@ def loan_registration_mode():
         if credit_limit is None:
             print("❌ 顧客の上限金額を取得できません。")
             return
+        
         
         if amount > credit_limit:
             print(f"⚠ 上限額({credit_limit}円) を超えています。貸付記録を保存できません。")
@@ -67,6 +68,8 @@ def main():
         print("1: 貸付記録モード")
         print("2: 貸付履歴表示モード")
         print("3: 返済記録モード")
+        print("4: 返済履歴表示モード")
+        print("5: 残高照会モード")
         print("0: 終了")
 
         choice = input("モードを選択してください: ").strip()
@@ -74,14 +77,29 @@ def main():
         if choice =="1":
             loan_registration_mode()
         elif choice == "2":
-             loan_history_mode()
+            loan_history_mode()
         elif choice == "3":
-             register_repayment()
+            register_repayment()
+        elif choice =='4':
+            print("\n=== 返済履歴表示モード ===")
+            customer_id = input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip().upper()
+            if not customer_id.startswith("CUST"):
+                customer_id = "CUST" + customer_id.zfill(3)
+            display_repayment_history(customer_id)
+        elif choice == "5":
+            print("\n=== 残高照会モード ===")
+            customer_id = input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip().upper()
+            if not customer_id.startswith("CUST"):
+                customer_id = "CUST" + customer_id.zfill(3)
+            display_balance(customer_id)
         elif choice == "0":
-             print("終了します。")
-             break
+            print("終了します。")
+            break
         else:
             print("❌ 無効な選択肢です。もう一度入力してください。")
 
 if __name__ == "__main__":
-            main()
+    display_unpaid_loans("CUST888")
+
+            #本来のメニュー画面を残したい場合はこれを残す
+            # main()
