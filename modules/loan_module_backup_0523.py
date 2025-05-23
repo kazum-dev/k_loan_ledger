@@ -129,24 +129,11 @@ def display_unpaid_loans(customer_id, loan_file='loan.csv', repayment_file='repa
             
         if unpaid_loans:
             print(f"\n■ 顧客ID: {customer_id} の未返済貸付一覧")
-            today = datetime.today().date()
-
             for loan in unpaid_loans:
                 loan_date = datetime.strptime(loan['loan_date'], '%Y-%m-%d').strftime('%Y年%m月%d日')
                 amount_str = f"{int(loan['loan_amount']):,}円"
-                due_date_str = loan.get('due_date', '')
-                status = ""
-
-                # ✅ 延滞チェック
-                if due_date_str:
-                    try:
-                        due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
-                        if due_date < today:
-                            status = "⚠延滞中"
-                    except ValueError:
-                        status = "⚠期日形式エラー"
-
-                print(f"{loan_date}｜{amount_str}｜返済期日：{due_date_str}{status}")
+                due_date = loan.get('due_date', '')
+                print(f"{loan_date}｜{amount_str}｜返済期日：{due_date}")
         else:
             print("✅ 全ての貸付は返済済みです。")
 
