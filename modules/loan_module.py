@@ -1,9 +1,6 @@
 import csv
 import os
-from datetime import datetime, timedelta
-
-
-
+from datetime import date, datetime, timedelta
 
 def register_loan(customer_id, amount, loan_date, due_date=None, file_path="loan.csv"):
     """
@@ -143,6 +140,9 @@ def display_unpaid_loans(customer_id, loan_file='loan.csv', repayment_file='repa
                         due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
                         if due_date < today:
                             status = "⚠延滞中"
+                            principal = int(loan["loan_amount"])
+                            days_late, late_fee = calculate_late_fee(principal, due_date)
+                            status += f"｜延滞日数：{days_late}日｜延滞手数料：¥{late_fee:,}"
                     except ValueError:
                         status = "⚠期日形式エラー"
 
@@ -152,3 +152,17 @@ def display_unpaid_loans(customer_id, loan_file='loan.csv', repayment_file='repa
 
     except Exception as e:
         print(f"❌ エラーが発生しました: {e}")
+
+from datetime import date
+
+def calculate_late_fee(principal, due_date):
+    """
+    月利10% （日割り0.0033）で延滞手数料を計算する
+    """
+    today = date.today()
+    if due_date < today:
+        days_late = (today - due_date).days
+        daily_late_rate = 0.10 / 30
+        late_fee = round(principal * daily_late_rate * days_late)
+        return days_late, late_fee
+    return 0, 0

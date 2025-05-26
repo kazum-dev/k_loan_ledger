@@ -1,5 +1,5 @@
 from modules.customer_module import list_customers, search_customer, get_all_customer_ids, get_credit_limit
-from modules.loan_module import register_loan,display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans
+from modules.loan_module import register_loan, display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans, calculate_late_fee
 from modules.balance_module import display_balance
 from datetime import datetime
 
@@ -99,7 +99,4 @@ def main():
             print("❌ 無効な選択肢です。もう一度入力してください。")
 
 if __name__ == "__main__":
-    display_unpaid_loans("CUST888")
-
-            #本来のメニュー画面を残したい場合はこれを残す
-            # main()
+            main()
