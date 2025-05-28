@@ -70,6 +70,7 @@ def main():
         print("3: 返済記録モード")
         print("4: 返済履歴表示モード")
         print("5: 残高照会モード")
+        print("9: 未返済サマリー表示（テスト用）")
         print("0: 終了")
 
         choice = input("モードを選択してください: ").strip()
@@ -92,6 +93,12 @@ def main():
             if not customer_id.startswith("CUST"):
                 customer_id = "CUST" + customer_id.zfill(3)
             display_balance(customer_id)
+        elif choice == "9":
+            print("\n=== 未返済貸付一覧＋サマリー ===")
+            customer_id = input("👤 顧客IDを入力してください（例：CUST001　または 001）: ").strip().upper()
+            if not customer_id.startswith("CUST"):
+                customer_id = "CUST" + customer_id.zfill(3)
+            display_unpaid_loans(customer_id)
         elif choice == "0":
             print("終了します。")
             break
@@ -99,4 +106,4 @@ def main():
             print("❌ 無効な選択肢です。もう一度入力してください。")
 
 if __name__ == "__main__":
-            main()
+    main()
