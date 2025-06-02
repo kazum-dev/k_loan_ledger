@@ -7,7 +7,7 @@ def loan_registration_mode():
     print("=== 顧客検索＆貸付記録モード ===")
 
     list_customers()
-    keyword = input("検索したい顧客名の一部を入力してください: ")
+    keyword = input("検索したい顧客名またはIDの一部を入力してください: ")
     search_customer(keyword)
 
     print("\n=== 貸付記録を登録 ===")

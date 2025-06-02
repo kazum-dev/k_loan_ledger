@@ -2,15 +2,34 @@ import csv
 import os
 from datetime import date, datetime, timedelta
 
+def generate_loan_id(file_path="loan.csv", loan_date=None):
+    if loan_date is None:
+        loan_date = datetime.today().strftime("%Y-%m-%d")
+
+    date_part = loan_date.replace("-", "")
+    prefix = f"L{date_part}-"
+
+    counter = 1
+    if os.path.exists(file_path):
+        with open(file_path, newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row.get("loan_date") == loan_date:
+                    counter += 1
+
+    return f"{prefix}{str(counter).zfill(3)}"
+
 def register_loan(customer_id, amount, loan_date, due_date=None, file_path="loan.csv"):
     """
     貸付情報をCSVに追記します。
     初回の場合はヘッダーも自動で追加します。
     """
-    header = ["customer_id", "loan_amount", "loan_date", "due_date"]
+    header = ["loan_id", "customer_id", "loan_amount", "loan_date", "due_date"]
 
     if due_date is None or due_date == "": 
         due_date =  (datetime.strptime(loan_date, "%Y-%m-%d") + timedelta(days=30)).strftime("%Y-%m-%d") 
+
+    loan_id = generate_loan_id(file_path, loan_date)
 
     try:
         #ファイルが存在しない、または空ならヘッダー追加
@@ -21,7 +40,7 @@ def register_loan(customer_id, amount, loan_date, due_date=None, file_path="loan
 
         with open(file_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerow([customer_id, amount, loan_date, due_date])
+            writer.writerow([loan_id, customer_id, amount, loan_date, due_date])
 
         print("✅貸付記録が保存されました。")
     except Exception as e:

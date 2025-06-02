@@ -69,7 +69,9 @@ def search_customer(keyword):
             matches = []
 
             for row in reader:
-                if row and keyword.lower().strip() in row['customer_name'].lower().strip():
+                name_match = keyword.lower() in row['customer_name'].lower().strip()
+                id_match = keyword.lower().strip() in row['customer_id'].lower().strip()
+                if name_match or id_match:
                     matches.append(row)
 
             if matches:
