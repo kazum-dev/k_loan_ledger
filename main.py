@@ -1,5 +1,5 @@
 from modules.customer_module import list_customers, search_customer, get_all_customer_ids, get_credit_limit
-from modules.loan_module import register_loan, display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans, calculate_late_fee
+from modules.loan_module import register_loan, display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans, calculate_late_fee, extract_overdue_loans
 from modules.balance_module import display_balance
 from datetime import datetime
 
@@ -71,6 +71,7 @@ def main():
         print("4: 返済履歴表示モード")
         print("5: 残高照会モード")
         print("9: 未返済サマリー表示（テスト用）")
+        print("10: 延滞貸付表示モード")
         print("0: 終了")
 
         choice = input("モードを選択してください: ").strip()
@@ -99,9 +100,17 @@ def main():
             if not customer_id.startswith("CUST"):
                 customer_id = "CUST" + customer_id.zfill(3)
             display_unpaid_loans(customer_id)
+        elif choice == "10":
+            print("\n=== 延滞手数料表示モード ===")
+            customer_id = input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip().upper()
+            if not customer_id.startswith("CUST"):
+                customer_id = "CUST" + customer_id.zfill(3)
+            extract_overdue_loans(customer_id)
+
         elif choice == "0":
             print("終了します。")
             break
+        
         else:
             print("❌ 無効な選択肢です。もう一度入力してください。")
 

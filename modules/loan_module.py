@@ -190,3 +190,53 @@ def calculate_late_fee(principal, due_date):
         late_fee = round(principal * daily_late_rate * days_late)
         return days_late, late_fee
     return 0, 0
+
+def extract_overdue_loans(customer_id, loan_file='loan.csv', repayment_file='repayments.csv'):
+    try:
+        with open(loan_file, newline='', encoding='utf-8') as lf:
+            loan_reader = csv.DictReader(lf)
+            loans = [row for row in loan_reader if row['customer_id'] == customer_id]
+
+        with open(repayment_file, newline='', encoding='utf-8') as rf:
+            repayment_reader = csv.DictReader(rf) 
+            repayments = [row for row in repayment_reader if row['customer_id'] == customer_id]
+
+        today = datetime.today().date()
+        overdue_loans = []
+
+        for loan in loans:
+            match_found = False
+            for repayment in repayments:
+                if(
+                    loan['loan_amount'] == repayment['amount'] and
+                    loan['loan_date'] == repayment['repayment_date']
+                ):
+                    match_found = True
+                    break
+            if match_found:
+                 continue
+            
+            due_date_str = loan.get('due_date', '')
+            if due_date_str:
+                try:
+                    due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+                    if due_date < today:
+                        overdue_loans.append(loan)
+                except ValueError:
+                    continue
+
+        if overdue_loans:
+            print(f"\n🚨 顧客ID: {customer_id} の延滞中の貸付一覧")
+            for loan in overdue_loans:
+                loan_date = datetime.strptime(loan['loan_date'], '%Y-%m-%d').strftime('%Y年%m月%d日')
+                amount_str = f"{int(loan['loan_amount']):,}円"
+                due_date_str = loan['due_date']
+                due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+                principal = int(loan["loan_amount"])
+                days_late, late_fee = calculate_late_fee(principal, due_date)
+                print(f"{loan_date}｜{amount_str}｜返済期日：{due_date_str}｜延滞：{days_late}日｜手数料：¥{late_fee:,}")
+        else:
+            print("✅ 現在延滞中の貸付はありません。")
+
+    except Exception as e:
+        print(f"❌ エラーが発生しました: {e}")
