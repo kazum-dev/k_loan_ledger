@@ -101,7 +101,7 @@ def main():
                 customer_id = "CUST" + customer_id.zfill(3)
             display_unpaid_loans(customer_id)
         elif choice == "10":
-            print("\n=== 延滞手数料表示モード ===")
+            print("\n=== 延滞貸付一覧表示モード ===")
             customer_id = input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip().upper()
             if not customer_id.startswith("CUST"):
                 customer_id = "CUST" + customer_id.zfill(3)

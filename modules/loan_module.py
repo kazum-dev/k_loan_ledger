@@ -168,7 +168,7 @@ def display_unpaid_loans(customer_id, loan_file='loan.csv', repayment_file='repa
                 print(f"{loan_date}｜{amount_str}｜返済期日：{due_date_str}{status}")
             # 🧮 未返済の件数と合計金額を表示（ステップA-4）
             total_unpaid =  len(unpaid_loans)
-            total_amount = sum(int(loan['loan_amount']) for laon in unpaid_loans)
+            total_amount = sum(int(loan['loan_amount']) for loan in unpaid_loans)
             print(f"\n🧮 未返済件数：{total_unpaid}件｜合計：¥{total_amount:,}")
 
         else:
