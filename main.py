@@ -46,11 +46,21 @@ def loan_registration_mode():
         print("❌ 金額は整数で入力してください。")
         return
 
+    interest_input = input("📈利率（％）を入力してください ※未入力時は10.0%: ").strip()
+    try:
+        interest_rate = float(interest_input) if interest_input else 10.0
+        if interest_rate <= 0:
+            print("❌ 利率は1%以上で入力してください。")
+            return
+    except ValueError:
+        print("❌ 利率は数値で入力してください。")
+        return
+    
     loan_date = input("📅貸付日を入力(例：2025-05-05)※未入力なら今日の日付になります: ")
     if not loan_date:
         loan_date = datetime.today().strftime("%Y-%m-%d")
 
-    register_loan(customer_id, amount, loan_date)
+    register_loan(customer_id, amount, loan_date, interest_rate_percent=interest_rate)
 
 def loan_history_mode():
     print("=== 履歴表示モード ===")
