@@ -25,10 +25,14 @@ def register_loan(customer_id, amount, loan_date, due_date=None, interest_rate_p
     貸付情報をCSVに追記します。
     初回の場合はヘッダーも自動で追加します。
     """
-    header = ["loan_id", "customer_id", "loan_amount", "loan_date", "due_date", "interest_rate_percent"]
+    header = ["loan_id", "customer_id", "loan_amount", "loan_date", "due_date", "interest_rate_percent", "repayment_expected"]
 
     if due_date is None or due_date == "": 
         due_date =  (datetime.strptime(loan_date, "%Y-%m-%d") + timedelta(days=30)).strftime("%Y-%m-%d") 
+
+    # 🔧 予定返済額（repayment_expected）を自動計算（整数に丸める）
+    repayment_expected = int(amount * (1 + interest_rate_percent / 100))
+    print(f"[DEBUG] 自動計算された予定返済額: {repayment_expected}")
 
     loan_id = generate_loan_id(file_path, loan_date)
 
@@ -42,7 +46,7 @@ def register_loan(customer_id, amount, loan_date, due_date=None, interest_rate_p
         with open(file_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             print("[DEBUG] 保存内容：", [loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent])
-            writer.writerow([loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent])
+            writer.writerow([loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected])
 
         print("✅貸付記録が保存されました。")
     except Exception as e:
