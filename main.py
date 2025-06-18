@@ -60,7 +60,12 @@ def loan_registration_mode():
     if not loan_date:
         loan_date = datetime.today().strftime("%Y-%m-%d")
 
-    register_loan(customer_id, amount, loan_date, interest_rate_percent=interest_rate)
+    repayment_method = input("💳返済方法を入力してください（例：現金／振込）: ").strip()
+    if not repayment_method:
+        repayment_method = "未設定"
+
+    register_loan(customer_id, amount, loan_date, interest_rate_percent=interest_rate, repayment_method=repayment_method)
+    
 
 def loan_history_mode():
     print("=== 履歴表示モード ===")
