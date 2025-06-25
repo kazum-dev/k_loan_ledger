@@ -19,13 +19,13 @@ def generate_loan_id(file_path="loan.csv", loan_date=None):
 
     return f"{prefix}{str(counter).zfill(3)}"
 
-def register_loan(customer_id, amount, loan_date, due_date=None, interest_rate_percent=10.0, repayment_method="未設定", file_path="loan.csv"):
+def register_loan(customer_id, amount, loan_date, due_date=None, interest_rate_percent=10.0, repayment_method="未設定", grace_period_days=0, file_path="loan.csv"):
     print(f"[DEBUG] 利率受信: {interest_rate_percent}")
     """
     貸付情報をCSVに追記します。
     初回の場合はヘッダーも自動で追加します。
     """
-    header = ["loan_id", "customer_id", "loan_amount", "loan_date", "due_date", "interest_rate_percent", "repayment_expected", "repayment_method"]
+    header = ["loan_id", "customer_id", "loan_amount", "loan_date", "due_date", "interest_rate_percent", "repayment_expected", "repayment_method", "grace_period_days"]
 
     if due_date is None or due_date == "": 
         due_date =  (datetime.strptime(loan_date, "%Y-%m-%d") + timedelta(days=30)).strftime("%Y-%m-%d") 
@@ -45,8 +45,8 @@ def register_loan(customer_id, amount, loan_date, due_date=None, interest_rate_p
 
         with open(file_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            print("[DEBUG] 保存内容：", [loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, repayment_method])
-            writer.writerow([loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, repayment_method])
+            print("[DEBUG] 保存内容：", [loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, repayment_method, grace_period_days])
+            writer.writerow([loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, repayment_method ,grace_period_days])
 
         print("✅貸付記録が保存されました。")
     except Exception as e:

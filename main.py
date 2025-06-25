@@ -64,7 +64,15 @@ def loan_registration_mode():
     if not repayment_method:
         repayment_method = "未設定"
 
-    register_loan(customer_id, amount, loan_date, interest_rate_percent=interest_rate, repayment_method=repayment_method)
+    # ⏳延滞猶予日数を入力
+    grace_input = input("⏳延滞猶予日数（日数）を入力してください（例：5) ※未入力なら0日: ").strip()
+    try:
+        grace_period_days = int(grace_input) if grace_input else 0
+    except ValueError:
+        print("❌ 猶予日数は整数で入力してください。")
+        return
+
+    register_loan(customer_id, amount, loan_date, interest_rate_percent=interest_rate, repayment_method=repayment_method,grace_period_days=grace_period_days)
     
 
 def loan_history_mode():
