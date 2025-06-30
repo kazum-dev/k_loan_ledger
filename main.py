@@ -72,9 +72,18 @@ def loan_registration_mode():
         print("❌ 猶予日数は整数で入力してください。")
         return
 
-    register_loan(customer_id, amount, loan_date, interest_rate_percent=interest_rate, repayment_method=repayment_method,grace_period_days=grace_period_days)
+    late_fee_input =  input("🔢 延滞利率（％）を入力してください（例：10.0） ※未入力で10.0: ").strip()
+    try:
+        late_fee_rate_percent = round(float(late_fee_input), 1) if late_fee_input else 10.0
+        if late_fee_rate_percent < 0:
+            print("❌ 延滞利率は0以上で入力してください。")
+            return
+    except ValueError:
+        print("❌ 延滞利率は数値で入力してください。")
+        return
     
-
+    register_loan(customer_id, amount, loan_date, interest_rate_percent=interest_rate, repayment_method=repayment_method,grace_period_days=grace_period_days, late_fee_rate_percent=late_fee_rate_percent, file_path="loan_v2.csv")
+    
 def loan_history_mode():
     print("=== 履歴表示モード ===")
     customer_id = input("👤 顧客IDを入力してください（例：CUST001 または 001）： ").strip().upper()
