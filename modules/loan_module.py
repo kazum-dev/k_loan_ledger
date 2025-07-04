@@ -19,7 +19,10 @@ def generate_loan_id(file_path="loan.csv", loan_date=None):
 
     return f"{prefix}{str(counter).zfill(3)}"
 
-def register_loan(customer_id, amount, loan_date, due_date=None, interest_rate_percent=10.0, repayment_method="未設定", grace_period_days=0, late_fee_rate_percent=10, file_path="loan_v2.csv"):
+# main.py から貸付データを受け取り CSV に書き込む
+# late_fee_rate_percent は延滞利率（％）
+# デフォルトは10.0
+def register_loan(customer_id, amount, loan_date, due_date=None, interest_rate_percent=10.0, repayment_method="未設定", grace_period_days=0, late_fee_rate_percent=10, file_path="loan_v3.csv"):
     print(f"[DEBUG] 利率受信: {interest_rate_percent}")
     print(f"[DEBUG] 延滞利率受信:{late_fee_rate_percent}%")
 
@@ -28,8 +31,9 @@ def register_loan(customer_id, amount, loan_date, due_date=None, interest_rate_p
     初回の場合はヘッダーも自動で追加します。
     """
 
-    header = ["loan_id", "customer_id", "loan_amount", "loan_date", "due_date", "interest_rate_percent", "repayment_expected", "repayment_method", "grace_period_days", "late_fee_rate_percent"]
+    header = ["loan_id", "customer_id", "loan_amount", "loan_date", "due_date", "interest_rate_percent", "repayment_expected", "repayment_method", "grace_period_days", "late_fee_rate_percent", "late_base_amount"]
 
+    # 返済期日が未入力なら loan_date の30日後を設定
     if due_date is None or due_date == "": 
         due_date =  (datetime.strptime(loan_date, "%Y-%m-%d") + timedelta(days=30)).strftime("%Y-%m-%d") 
 
@@ -37,20 +41,27 @@ def register_loan(customer_id, amount, loan_date, due_date=None, interest_rate_p
     repayment_expected = int(amount * (1 + interest_rate_percent / 100))
     print(f"[DEBUG] 自動計算された予定返済額: {repayment_expected}")
 
+    # 🔧 late_base_amount をコピー
+    late_base_amount = amount
+    print(f"[DEBUG] late_base_amount の設定: {late_base_amount}")
+
+    # ユニークな loan_id を生成
     loan_id = generate_loan_id(file_path, loan_date)
 
     try:
-        #ファイルが存在しない、または空ならヘッダー追加
+        # ファイルが存在しない or 空なら header を w モードで書く
         if not os.path.exists(file_path) or os.stat(file_path).st_size == 0:    
             with open(file_path, mode='w', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
                 writer.writerow(header)
 
+        # データ行を a モードで追記する
         with open(file_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            print("[DEBUG] 保存内容：", [loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, repayment_method, grace_period_days, late_fee_rate_percent])
-            writer.writerow([loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, repayment_method ,grace_period_days, late_fee_rate_percent])
-
+            print("[DEBUG] 保存内容：", [loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, repayment_method, grace_period_days, late_fee_rate_percent, late_base_amount])
+            writer.writerow([loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, repayment_method ,grace_period_days, late_fee_rate_percent, late_base_amount])
+        
+        # 保存成功メッセージ
         print("✅貸付記録が保存されました。")
     except Exception as e:
         print(f"❌エラーが発生しました: {e}")
