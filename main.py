@@ -115,7 +115,7 @@ def loan_history_mode():
         customer_id = "CUST" + customer_id.zfill(3)
 
     # 顧客IDを受け取り、その顧客の貸付履歴をCSVから表示する
-    display_loan_history(customer_id)
+    display_loan_history(customer_id, filepath='loan_v3.csv')
 
 def main():
     # メニューを表示して、どのモードを動かすか選ぶ
