@@ -11,6 +11,10 @@ from modules.balance_module import display_balance
 # 日付操作用
 from datetime import datetime
 
+# B-11
+import csv
+import os
+
 def loan_registration_mode():
 
     # 顧客IDの存在を確認
@@ -117,6 +121,80 @@ def loan_history_mode():
     # 顧客IDを受け取り、その顧客の貸付履歴をCSVから表示する
     display_loan_history(customer_id, filepath='loan_v3.csv')
 
+# repayment_registration_mode の定義
+def repayment_registration_mode():
+
+    print("\n=== 返済記録モード (B-11 新実装）===")
+
+    loans_file = "loan_v3.csv"
+    repayments_file = "repayments.csv"
+
+    # repayments.csv ヘッダ初期化
+    def initialize_repayments_csv():
+        header = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
+        with open(repayments_file, mode="w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(header)
+        print("[INFO] repayments.csv を初期化しました。")
+
+    # loan_id 存在確認 & customer_id 取得
+    def get_customer_id_by_loan_id(loan_id):
+        with open(loans_file, mode="r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                if row["loan_id"] == loan_id:
+                    print(f"[DEBUG] loan_id {loan_id} 存在します。customer_id={row['customer_id']}")
+                    return row["customer_id"]
+        print(f"[ERROR] loan_id {loan_id} が loan_v3.csv に存在しません。")
+        return None
+
+    # repayments.csv へ追記
+    def append_repayment_row(row_dict):
+        file_exists = os.path.isfile(repayments_file)
+        if not file_exists:
+            initialize_repayments_csv()
+
+        with open(repayments_file, mode="a", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=["loan_id", "customer_id","repayment_amount", "repayment_date"]
+            )
+            writer.writerow(row_dict)
+        print(f"[INFO] repayments.csv に追記しました: {row_dict}")
+
+    # 処理開始
+    loan_id = input("登録する loan_id を入力してください: ").strip()
+    customer_id = get_customer_id_by_loan_id(loan_id)
+    if customer_id is None:
+        print("[ERROR] 処理を終了します。")
+        return
+
+    # 金額入力
+    while True:
+        repayment_amount = input("返済金額を入力してください（整数）: ").strip()
+        if repayment_amount.isdigit() and int(repayment_amount) > 0:
+            repayment_amount = int(repayment_amount)
+            break
+        else:
+            print("[ERROR] 数字かつ1円以上を入力してください。")
+
+    # 日付入力
+    repayment_date = input("返済日を入力してください (YYYY-MM-DD、未入力で今日の日付): ").strip()
+    if repayment_date == "":
+        repayment_date = datetime.today().strftime("%Y-%m-%d")
+        print(f"[INFO] 返済日は本日に自動設定しました: {repayment_date}")
+
+    # 追記
+    row = {
+        "loan_id": loan_id,
+        "customer_id": customer_id,
+        "repayment_amount": repayment_amount,
+        "repayment_date": repayment_date
+    } 
+    append_repayment_row(row)
+
+    print("✅ 返済記録の登録が完了しました。")
+
 def main():
     # メニューを表示して、どのモードを動かすか選ぶ
     # ユーザーの入力に応じて各モードを呼び出す
@@ -138,7 +216,7 @@ def main():
         elif choice == "2":
             loan_history_mode()
         elif choice == "3":
-            register_repayment() #返済記録を登録する関数
+            repayment_registration_mode() #B-11新実装の関数
         elif choice =='4':
             print("\n=== 返済履歴表示モード ===")
             customer_id = input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip().upper()
