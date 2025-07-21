@@ -132,6 +132,8 @@ def display_loan_history(customer_id, filepath):
 
 # 顧客からの返済を登録する関数
 def register_repayment():
+    loan_id = input("返済する loan_id を入力してください（例：L20250709-001）: ").strip()
+
     #顧客IDの入力と補正
     customer_id = input("顧客IDを入力してください（例：001 または CUST001）： ").strip()
 
@@ -164,7 +166,7 @@ def register_repayment():
         with open("repayments.csv", mode="a", newline="", encoding="utf-8") as file:
             writer = csv.writer(file)
             # 顧客ID・返済額・返済日を保存
-            writer.writerow([customer_id, amount, repayment_date])
+            writer.writerow([loan_id, customer_id, amount, repayment_date])
 
         # 保存成功メッセージ
         print(f"✅ {customer_id} の返済記録を保存しました。")
@@ -172,6 +174,53 @@ def register_repayment():
     except Exception as e:
         # CSV書き込みエラー時のメッセージ
         print(f"❌ CSV書き込み中にエラーが発生しました: {e}")
+
+# ▼ B-11.2：過剰返済チェックの共通関数
+def is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
+    """
+    予定返済額を超えてないかチェックする。
+    超えていたらFalseを返し、同時にエラーメッセージを出力する。
+    超えていたらFalseを返し、同時にエラーメッセージを出力する。
+    """
+    loan_info = get_loan_info_by_loan_id(loans_file, loan_id)
+    if loan_info is None:
+        print("❌ 指定された loan_id が loan_v3.csv に見つかりません")
+        return False
+    
+    try:
+        repayment_expected = int(loan_info["repayment_expected"])
+    except (KeyError, ValueError):
+        print("❌ repayment_expected の読み込みに失敗しました。")
+        return False
+
+    total_repaid = get_total_repaid_amount(repayments_file, loan_id)
+
+    if total_repaid + repayment_amount > repayment_expected:
+        print(f"❌ 返済額が予定額を超えています。現在の累計返済額：{total_repaid}円 / 予定：{repayment_expected}円")
+        return False
+
+    return True 
+
+# --- 貸付データから loan_id に対応するレコードを取得 ---
+def get_loan_info_by_loan_id(file_path, loan_id):
+    with open(file_path, newline='', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            if row['loan_id'] == loan_id:
+                return row
+    return None
+
+# --- 返済データからloan_id に対応する返済額を計算 ---
+def get_total_repaid_amount(file_path, loan_id):
+    total = 0
+    with open(file_path, newline='', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            if row['loan_id'] == loan_id:
+                print(f"DEBUG: 加算中 -> {row['repayment_amount']}")
+                total += int(row['repayment_amount'])
+    return total
+
 
 # 顧客IDごとの返済履歴を表示する関数
 def display_repayment_history(customer_id, filepath='repayments.csv'):

@@ -15,6 +15,9 @@ from datetime import datetime
 import csv
 import os
 
+# B-11.1
+from modules.loan_module import register_loan, get_total_repaid_amount, get_loan_info_by_loan_id, is_over_repayment
+
 def loan_registration_mode():
 
     # 顧客IDの存在を確認
@@ -129,7 +132,7 @@ def repayment_registration_mode():
     loans_file = "loan_v3.csv"
     repayments_file = "repayments.csv"
 
-    # repayments.csv ヘッダ初期化
+    # repayments.csv がなければ新規作成＆ヘッダー初期化（初回呼び出し時にのみ使用）
     def initialize_repayments_csv():
         header = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
         with open(repayments_file, mode="w", newline="", encoding="utf-8") as f:
@@ -139,16 +142,19 @@ def repayment_registration_mode():
 
     # loan_id 存在確認 & customer_id 取得
     def get_customer_id_by_loan_id(loan_id):
+        # loan_v3を読み取り、loan_id が存在するかどうかを検証
         with open(loans_file, mode="r", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             for row in reader:
                 if row["loan_id"] == loan_id:
                     print(f"[DEBUG] loan_id {loan_id} 存在します。customer_id={row['customer_id']}")
+                    #一致すれば customer_id を返す。
                     return row["customer_id"]
         print(f"[ERROR] loan_id {loan_id} が loan_v3.csv に存在しません。")
-        return None
+        # 存在しなければNone を返す。
+        return None 
 
-    # repayments.csv へ追記
+    # 貸付情報1件を repayments.csv へ追記
     def append_repayment_row(row_dict):
         file_exists = os.path.isfile(repayments_file)
         if not file_exists:
@@ -162,14 +168,15 @@ def repayment_registration_mode():
             writer.writerow(row_dict)
         print(f"[INFO] repayments.csv に追記しました: {row_dict}")
 
-    # 処理開始
+    # 処理開始(ユーザー入力)
+    # loan_id入力
     loan_id = input("登録する loan_id を入力してください: ").strip()
     customer_id = get_customer_id_by_loan_id(loan_id)
     if customer_id is None:
         print("[ERROR] 処理を終了します。")
         return
 
-    # 金額入力
+    # 返済金額入力
     while True:
         repayment_amount = input("返済金額を入力してください（整数）: ").strip()
         if repayment_amount.isdigit() and int(repayment_amount) > 0:
@@ -178,7 +185,10 @@ def repayment_registration_mode():
         else:
             print("[ERROR] 数字かつ1円以上を入力してください。")
 
-    # 日付入力
+    if not is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
+        return
+
+    # 返済日入力
     repayment_date = input("返済日を入力してください (YYYY-MM-DD、未入力で今日の日付): ").strip()
     if repayment_date == "":
         repayment_date = datetime.today().strftime("%Y-%m-%d")
