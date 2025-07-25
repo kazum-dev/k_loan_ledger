@@ -1,2 +1,3 @@
 loan_id,customer_id,loan_amount,loan_date,due_date,interest_rate_percent,repayment_expected,repayment_method,grace_period_days,late_fee_rate_percent,late_base_amount
 L20250721-001,CUST001,10000,2025-07-10,2025-08-10,10,10000,現金,7,10,10000
+L20250723-001,CUST003,20000,2025-07-23,2025-08-22,100.0,40000,現金,0,10.0,20000

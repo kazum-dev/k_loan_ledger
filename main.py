@@ -3,7 +3,7 @@
 from modules.customer_module import list_customers, search_customer, get_all_customer_ids, get_credit_limit
 
 # 貸付・返済関連の関数を import
-from modules.loan_module import register_loan, display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans, calculate_late_fee, extract_overdue_loans
+from modules.loan_module import register_loan, display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans, calculate_late_fee, extract_overdue_loans, calculate_total_repaid_by_loan_id
 
 # 残高照会関連の関数を import
 from modules.balance_module import display_balance
@@ -185,8 +185,9 @@ def repayment_registration_mode():
         else:
             print("[ERROR] 数字かつ1円以上を入力してください。")
 
+    # 過剰返済かチェック
     if not is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
-        return
+        return #処理中断
 
     # 返済日入力
     repayment_date = input("返済日を入力してください (YYYY-MM-DD、未入力で今日の日付): ").strip()
@@ -201,7 +202,7 @@ def repayment_registration_mode():
         "repayment_amount": repayment_amount,
         "repayment_date": repayment_date
     } 
-    append_repayment_row(row)
+    append_repayment_row(row) # ここでCSVに書き込み
 
     print("✅ 返済記録の登録が完了しました。")
 
@@ -259,5 +260,11 @@ def main():
         else:
             print("❌ 無効な選択肢です。もう一度入力してください。")
 
+
 if __name__ == "__main__":
     main()
+
+# --- テスト用（B-12）---
+#    test_loan_id = "L20250721-001"
+#    result = calculate_total_repaid_by_loan_id("repayments.csv", test_loan_id)
+#    print(f"📊 Loan ID {test_loan_id} の累計返済額は：{result:,}円")
