@@ -3,7 +3,7 @@
 from modules.customer_module import list_customers, search_customer, get_all_customer_ids, get_credit_limit
 
 # 貸付・返済関連の関数を import
-from modules.loan_module import register_loan, display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans, calculate_late_fee, extract_overdue_loans, calculate_total_repaid_by_loan_id
+from modules.loan_module import register_loan, display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans, calculate_late_fee, extract_overdue_loans, calculate_total_repaid_by_loan_id, is_loan_fully_repaid
 
 # 残高照会関連の関数を import
 from modules.balance_module import display_balance
@@ -262,7 +262,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    loan_id = "L20250723-001"
+    result = is_loan_fully_repaid(loan_id)
+    print(f"[判定結果] Loan {loan_id} fully repaid? → {result}")
+
+    #main()
 
 # --- テスト用（B-12）---
 #    test_loan_id = "L20250721-001"

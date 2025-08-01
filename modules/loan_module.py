@@ -1,5 +1,6 @@
 import csv
 import os
+import pandas as pd
 from datetime import date, datetime, timedelta
 
 # 日付ごとにユニークな loan_id を生成する関数
@@ -447,14 +448,17 @@ def extract_overdue_loans(customer_id, loan_file='loan.csv', repayment_file='rep
 
 def calculate_total_repaid_by_loan_id(repayments_file, loan_id):
     """
-    指定された loan_id に対応する累計返済情報を計算して返す変数。
+    指定された loan_id に対応する累計返済情報を計算して合計値として返す変数。
     """
     import csv
 
     total = 0
     try:
+        # ファイルを開く
         with open(repayments_file, mode='r', encoding='utf-8') as file:
+            # 行を辞書として処理
             reader = csv.DictReader(file)
+            # 各行に対して loan_id の一致チェック
             for row in reader:
                 if row.get('loan_id') == loan_id:
                     try:
@@ -470,3 +474,25 @@ def calculate_total_repaid_by_loan_id(repayments_file, loan_id):
         return 0
     
     return total
+
+def get_repayment_expected(loan_id: str, loan_file: str = "loan_v3.csv") -> float:
+    """
+    指定された loan_id に対して予定返済額を取得する。
+    """
+    df = pd.read_csv(loan_file)
+    row = df[df["loan_id"] == loan_id]
+
+    if row.empty:
+        raise ValueError(f"[ERROR] loan_id '{loan_id} がloan_v3.csv に存在しません。")
+    
+    return float(row.iloc[0]["repayment_expected"])
+
+def is_loan_fully_repaid(loan_id: str, loan_file: str = "loan_v3.csv", repayments_file: str = "repayments.csv") -> bool:
+    """
+    完了された loan_id の返済が完了しているかどうかを判定する。
+    完了 → True、未完了 → False
+    """
+    expected = get_repayment_expected(loan_id, loan_file)
+    total_repaid = calculate_total_repaid_by_loan_id(repayments_file, loan_id)
+
+    return total_repaid >= expected
