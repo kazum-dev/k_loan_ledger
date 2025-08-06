@@ -262,11 +262,14 @@ def main():
 
 
 if __name__ == "__main__":
-    loan_id = "L20250723-001"
-    result = is_loan_fully_repaid(loan_id)
-    print(f"[判定結果] Loan {loan_id} fully repaid? → {result}")
+    main()
 
-    #main()
+# --- テスト用（B-13）---    
+    #loan_id = "L20250723-001"
+    #result = is_loan_fully_repaid(loan_id)
+    #print(f"[判定結果] Loan {loan_id} fully repaid? → {result}")
+
+    
 
 # --- テスト用（B-12）---
 #    test_loan_id = "L20250721-001"

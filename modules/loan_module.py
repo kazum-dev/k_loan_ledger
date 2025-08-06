@@ -261,8 +261,58 @@ def display_repayment_history(customer_id, filepath='repayments.csv'):
         # その他の予期せぬエラー
         print(f"予期せぬエラーが発生しました: {e}")
 
-# 未返済の貸付を抽出して表示する関数
-def display_unpaid_loans(customer_id, loan_file='loan.csv', repayment_file='repayments.csv'):
+def display_unpaid_loans(customer_id, loan_file='loan_v3.csv', repayment_file='repayments.csv'):
+    try:
+        # 貸付データを読み込む
+        with open(loan_file, newline='', encoding='utf-8') as lf:
+            loan_reader = csv.DictReader(lf)
+            loans = [row for row in loan_reader if row['customer_id'] == customer_id]
+
+        # 未返済の貸付リスト
+        unpaid_loans = []
+        for loan in loans:
+            loan_id = loan['loan_id']
+            if not is_loan_fully_repaid(loan_id, loan_file, repayment_file):
+                unpaid_loans.append(loan)
+
+        # 表示処理
+        if unpaid_loans:
+            print(f"\n■ 顧客ID: {customer_id} の未返済貸付一覧")
+            today = datetime.today().date()
+
+            for loan in unpaid_loans:
+                loan_date = datetime.strptime(loan['loan_date'], '%Y-%m-%d').strftime('%Y年%m月%d日')
+                amount_str = f"{int(loan['loan_amount']):,}円"
+                due_date_str = loan.get('due_date', '')
+                status = ""
+
+                # 延滞判定（期日を過ぎているか）
+                if due_date_str:
+                    try:
+                        due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+                        if due_date < today:
+                            status = "⚠延滞中"
+                            principal = int(loan["loan_amount"])
+                            days_late, late_fee = calculate_late_fee(principal, due_date)
+                            status += f"|延滞日数：{days_late}日|延滞手数料：¥{late_fee:,}"
+                    except ValueError:
+                        status = "⚠期日形式エラー"
+
+                print(f"{loan_date}|{amount_str}|返済期日：{due_date_str}{status}")
+
+            # 合計表示
+            total_unpaid = len(unpaid_loans)
+            total_amount = sum(int(loan['loan_amount']) for loan in unpaid_loans)
+            print(f"\n🧮 未返済件数：{total_unpaid}件|合計：¥{total_amount:,}")
+
+        else:
+            print("✅ 全ての貸付は返済済みです。")
+
+    except Exception as e:
+        print(f"❌ エラーが発生しました: {e}")
+
+# 未返済の貸付を抽出して表示する関数 バックアップ（旧バージョン）
+def display_unpaid_loans_old(customer_id, loan_file='loan.csv', repayment_file='repayments.csv'):
     try:
         # 貸付データを読み込む
         with open(loan_file, newline='', encoding='utf-8') as lf:
