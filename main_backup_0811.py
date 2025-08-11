@@ -3,7 +3,7 @@
 from modules.customer_module import list_customers, search_customer, get_all_customer_ids, get_credit_limit
 
 # 貸付・返済関連の関数を import
-from modules.loan_module import register_loan, display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans, calculate_late_fee, calculate_total_repaid_by_loan_id, is_loan_fully_repaid
+from modules.loan_module import register_loan, display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans, calculate_late_fee, extract_overdue_loans, calculate_total_repaid_by_loan_id, is_loan_fully_repaid
 
 # 残高照会関連の関数を import
 from modules.balance_module import display_balance
@@ -245,13 +245,13 @@ def main():
             customer_id = input("👤 顧客IDを入力してください（例：CUST001　または 001）: ").strip().upper()
             if not customer_id.startswith("CUST"):
                 customer_id = "CUST" + customer_id.zfill(3)
-            display_unpaid_loans(customer_id, filter_mode="all") # 顧客IDを受け取り、まだ返済が済んでいない貸付を一覧表示する
+            display_unpaid_loans(customer_id) # 顧客IDを受け取り、まだ返済が済んでいない貸付を一覧表示する
         elif choice == "10":
             print("\n=== 延滞貸付一覧表示モード ===")
             customer_id = input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip().upper()
             if not customer_id.startswith("CUST"):
                 customer_id = "CUST" + customer_id.zfill(3)
-            display_unpaid_loans(customer_id, filter_mode="overdue") # 顧客IDを受け取り、返済期日を過ぎた貸付だけを表示する
+            extract_overdue_loans(customer_id) # 顧客IDを受け取り、返済期日を過ぎた貸付だけを表示する
 
         elif choice == "0":
             print("終了します。")

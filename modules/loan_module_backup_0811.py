@@ -262,150 +262,55 @@ def display_repayment_history(customer_id, filepath='repayments.csv'):
         print(f"予期せぬエラーが発生しました: {e}")
 
 # 未返済の貸付を表示　B-14　新
-def display_unpaid_loans(
-        customer_id, 
-        loan_file='loan_v3.csv', 
-        repayment_file='repayments.csv',
-        *,
-        filter_mode='all',  # "all" /  "overdue"
-        today=None,
-):
-    """
-    未返済ローンを一括表示する。
-    - filter_mode="all"     : 返済期日を問わず未返済すべて（旧モード9）
-    - filter_mode="overdue" : 返済期日を過ぎた未返済のみ（旧モード10）
-    """
+def display_unpaid_loans(customer_id, loan_file='loan_v3.csv', repayment_file='repayments.csv'):
     try:
-        _today = today or date.today()
-
-        # 1) 顧客の全貸付
+        # 貸付データを読み込む
         with open(loan_file, newline='', encoding='utf-8') as lf:
             loan_reader = csv.DictReader(lf)
-            loans = [row for row in loan_reader if row.get('customer_id') == customer_id]
+            loans = [row for row in loan_reader if row['customer_id'] == customer_id]
 
-        # 2) 未返済のみ抽出（loan_idベース）
-        unpaid = []
+        # 未返済の貸付リスト
+        unpaid_loans = []
         for loan in loans:
-            loan_id = loan.get('loan_id')
-            if not loan_id:
-                continue
-            if not is_loan_fully_repaid(loan_id, loan_file, repayment_file):
-                unpaid.append(loan)
-
-        # 3) overdueフィルタ
-        def _is_overdue(row):
-            ds = row.get('due_date', '')
-            if not ds:
-                return False
-            try:
-                due = datetime.strptime(ds, '%Y-%m-%d').date()
-            except ValueError:
-                return False
-            return due < _today
-        
-        if filter_mode == 'overdue':
-            unpaid = [ln for ln in unpaid if _is_overdue(ln)]
-        elif filter_mode != 'all':
-            print(f"[WARN] 未知のfilter_mode: {filter_mode} → 'all'扱い")
-
-        # 4) 並び順：期日昇順→loan_id（期日なし/不正は末尾）
-        def _due_key(ln):
-            ds = ln.get('due_date', '')
-            try:
-                return (0, datetime.strptime(ds, '%Y-%m-%d').date(), ln.get('loan_id', ''))
-            except ValueError:
-                return (1, date.max, ln.get('loan_id', ''))
-            
-        unpaid.sort(key=_due_key)
-
-        # 3) 表示
-        if not unpaid:
-            if filter_mode == 'overdue':
-                print("✅ 現在延滞中の未返済はありません。")
-            else:
-                print("✅ 全ての貸付は返済済みです。")
-            return []
-        
-        header = f"\n■ 顧客ID: {customer_id} の{'延滞中の未返済' if filter_mode=='overdue' else '未返済'}貸付一覧"
-        print(header)
-        print("  [STATUS]  loan_id      ｜貸付日        ｜金額        ｜期日           ｜予定        ｜返済済      ｜残高")
-
-        rows_out = []
-        for loan in unpaid:
             loan_id = loan['loan_id']
-            loan_date_jp = datetime.strptime(loan['loan_date'], '%Y-%m-%d').strftime('%Y年%m月%d日')
-            amount = int(loan['loan_amount'])
-            amount_str = f"{amount:,}円"
+            if not is_loan_fully_repaid(loan_id, loan_file, repayment_file):
+                unpaid_loans.append(loan)
 
-            due_str = loan.get('due_date', '')
-            status = 'UNPAID'
-            days_late = 0
-            late_fee = 0
+        # 表示処理
+        if unpaid_loans:
+            print(f"\n■ 顧客ID: {customer_id} の未返済貸付一覧")
+            today = datetime.today().date()
 
-            # 予定返済額・累計返済・残
-            try:
-                expected = int(loan.get('repayment_expected', '0'))
-            except ValueError:
-                expected = 0
-            total_repaid = calculate_total_repaid_by_loan_id(repayment_file, loan_id)
-            remaining = max(0, expected - total_repaid)
+            for loan in unpaid_loans:
+                loan_date = datetime.strptime(loan['loan_date'], '%Y-%m-%d').strftime('%Y年%m月%d日')
+                amount_str = f"{int(loan['loan_amount']):,}円"
+                due_date_str = loan.get('due_date', '')
+                status = ""
 
-            if due_str:
-                try:
-                    due = datetime.strptime(due_str, '%Y-%m-%d').date()
-                    due_jp = due.strftime('%Y年%m月%d日')
-                    if due < _today:
-                        status = 'OVERDUE'
-                        days_late, late_fee = calculate_late_fee(amount, due)
-                except ValueError:
-                    status = 'DATE_ERR'
-                    due_jp = due_str # 壊れている場合は原文
+                # 延滞判定（期日を過ぎているか）
+                if due_date_str:
+                    try:
+                        due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+                        if due_date < today:
+                            status = "⚠延滞中"
+                            principal = int(loan["loan_amount"])
+                            days_late, late_fee = calculate_late_fee(principal, due_date)
+                            status += f"|延滞日数：{days_late}日|延滞手数料：¥{late_fee:,}"
+                    except ValueError:
+                        status = "⚠期日形式エラー"
 
-            sep = "｜"
-            extra = f"{sep}延滞：{days_late}日{sep}手数料：¥{late_fee:,}" if status == 'OVERDUE' else ""
-            line = (
-                f"[{status:<7}] "
-                f"{loan_id:<14}{sep}"
-                f"{loan_date_jp:<12}{sep}"
-                f"{amount_str:>10}{sep}"
-                f"期日：{due_jp:<12}{sep}"
-                f"予定：¥{expected:,}{sep}"
-                f"返済済：¥{total_repaid:,}{sep}"
-                f"残：¥{remaining:,}"
-                f"{extra}"
-            )
-            print(line)
+                print(f"{loan_date}|{amount_str}|返済期日：{due_date_str}{status}")
 
-            rows_out.append({
-                "loan_id": loan_id,
-                "loan_date": loan["loan_date"],
-                "loan_amount": amount,
-                "due_date": due_str,
-                "status": status,
-                "repayment_expected": expected,
-                "total_repaid": total_repaid,
-                "remaining":  remaining,
-                "days_late": days_late,
-                "late_fee": late_fee,
-            })
+            # 合計表示
+            total_unpaid = len(unpaid_loans)
+            total_amount = sum(int(loan['loan_amount']) for loan in unpaid_loans)
+            print(f"\n🧮 未返済件数：{total_unpaid}件|合計：¥{total_amount:,}")
 
-        # サマリー
-        total_unpaid = len(rows_out)
-        total_remaining = sum(r["remaining"] for r in rows_out)
-
-        # 内訳（モード9のみ表示）
-        if filter_mode == "all":
-            overdue_count = sum(1 for r in rows_out if r["status"] == "OVERDUE")
-            in_time_count = total_unpaid - overdue_count
-            print(f"\n内訳：延滞 {overdue_count} 件 / 期日内 {in_time_count} 件")
-
-        print(f"\n🧮 件数：{total_unpaid}件|残高合計：¥{total_remaining:,}")
-
-        return rows_out
+        else:
+            print("✅ 全ての貸付は返済済みです。")
 
     except Exception as e:
         print(f"❌ エラーが発生しました: {e}")
-        return []
 
 # 未返済の貸付を抽出して表示する関数 バックアップ（旧バージョン）
 def display_unpaid_loans_old(customer_id, loan_file='loan.csv', repayment_file='repayments.csv'):
