@@ -341,6 +341,7 @@ def display_unpaid_loans(
             status = 'UNPAID'
             days_late = 0
             late_fee = 0
+            recovery_amount = None
 
             # 予定返済額・累計返済・残
             try:
@@ -356,13 +357,41 @@ def display_unpaid_loans(
                     due_jp = due.strftime('%Y年%m月%d日')
                     if due < _today:
                         status = 'OVERDUE'
-                        days_late, late_fee = calculate_late_fee(amount, due)
+
+                        # --- B-15：CSVの設定で延滞計算 ---
+                        try:
+                            late_base_amount = int(float(loan.get('late_base_amount', amount)))
+                        except ValueError:
+                            late_base_amount = amount
+                        try:
+                            late_rate_percent = float(loan.get('late_fee_rate_dpercent', 10.0))
+                        except ValueError:
+                            late_rate_percent = 10.0
+
+                        days_late, late_fee = calculate_late_fee(
+                            late_base_amount, 
+                            due,
+                            late_fee_rate_percent=late_rate_percent
+                        )
+                        recovery_amount = expected + late_fee # 🧾 回収額
                 except ValueError:
                     status = 'DATE_ERR'
                     due_jp = due_str # 壊れている場合は原文
+            else:
+                due_jp = due_str
 
             sep = "｜"
-            extra = f"{sep}延滞：{days_late}日{sep}手数料：¥{late_fee:,}" if status == 'OVERDUE' else ""
+            # 延滞行のみ、追加情報を右側に連結
+            extra = ""
+            if status == 'OVERDUE':
+                extra = (
+                    f"{sep}延滞日数：{days_late}日"
+                    f"{sep}延滞手数料：¥{late_fee:,}"
+                    f"{sep}🧾回収額：¥{recovery_amount:,}"
+                )
+            else:
+                extra = ""
+
             line = (
                 f"[{status:<7}] "
                 f"{loan_id:<14}{sep}"
@@ -488,30 +517,22 @@ def display_unpaid_loans_old(customer_id, loan_file='loan.csv', repayment_file='
 from datetime import date
 
 # 延滞日数と延滞手数料を計算する関数
-def calculate_late_fee(principal, due_date):
+def calculate_late_fee(principal, due_date, *, late_fee_rate_percent: float = 10.0):
     """
-    月利10%を基準とし、(日割り0.0033)で延滞手数料を計算する
+    月利(late_fee_rate_percent %）を (月利/30) の日割りで計算。
+    - principal: 延滞対象元金(CSV の late_base_amount を想定)
+    - due_date: 返済期日 (date)
+    - late_fee_rate_percent: 月利 (%)　デフォルト10.0
+    return: (days_late, late_fee)
     """
-
-    # 今日の日付を取得
     today = date.today()
-
-    # 期日を過ぎていれば延滞とみなす
     if due_date < today:
-        # 延滞日数を計算
         days_late = (today - due_date).days
-
-        # 日割り利率（例：月利10% ÷ 30日）
-        daily_late_rate = 0.10 / 30
-
-        # 延滞手数料を計算
-        late_fee = round(principal * daily_late_rate * days_late)
-
-        # 延滞日数と手数料を返す
+        daily_late_rate = (float(late_fee_rate_percent) / 100.0) / 30.0
+        late_fee = round(int(principal) * daily_late_rate * days_late)
         return days_late, late_fee
-    
-    # 延滞していない場合は0を返す
     return 0, 0
+    
 
 # 延滞中の貸付を抽出して表示する関数
 def extract_overdue_loans(customer_id, loan_file='loan.csv', repayment_file='repayments.csv'):
