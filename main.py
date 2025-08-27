@@ -263,6 +263,21 @@ def main():
 
 if __name__ == "__main__":
     main()
+# ---テスト用（C-0）
+    #from datetime import date
+    #from modules.loan_module import display_unpaid_loans
+
+    # テスト用の顧客ID
+    #test_customer = "CUST003"
+
+    #print("=== C-0 動作確認テスト ===")
+    #display_unpaid_loans(
+        #customer_id=test_customer,
+        #loan_file="loan_v3.csv",
+        #repayment_file="repayments.csv",
+        #filter_mode="overdue",
+        #today=date(2025, 8, 27)    
+    #)
 
 # --- テスト用（B-13）---    
     #loan_id = "L20250723-001"

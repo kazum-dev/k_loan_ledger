@@ -162,18 +162,38 @@ def register_repayment():
     if not repayment_date:
         repayment_date = str(datetime.today().date())
 
-    #CSVに返済データを追記
-    try:
-        with open("repayments.csv", mode="a", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
+    #CSVに返済データを追記(旧)
+    #try:
+        #with open("repayments.csv", mode="a", newline="", encoding="utf-8") as file:
+            #writer = csv.writer(file)
             # 顧客ID・返済額・返済日を保存
-            writer.writerow([loan_id, customer_id, amount, repayment_date])
+            #writer.writerow([loan_id, customer_id, amount, repayment_date])
 
         # 保存成功メッセージ
-        print(f"✅ {customer_id} の返済記録を保存しました。")
+        #print(f"✅ {customer_id} の返済記録を保存しました。")
 
-    except Exception as e:
+    #except Exception as e:
         # CSV書き込みエラー時のメッセージ
+        #print(f"❌ CSV書き込み中にエラーが発生しました: {e}")
+
+    # CSVに返済データを追記（ヘッダー保証 + 列名を新仕様に統一）
+    try:
+        header = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
+        file_exists = os.path.exists("repayments.csv")
+        need_header = (not file_exists) or (os.stat("repayments.csv").st_size == 0)
+
+        with open("repayments.csv", mode="a", newline="", encoding="utf-8") as file:
+            writer = csv.DictWriter(file, fieldnames=header)
+            if need_header:
+                writer.writeheader()
+            writer.writerow({
+                "loan_id": loan_id,
+                "customer_id": customer_id,
+                "repayment_amount": amount,
+                "repayment_date": repayment_date
+            })
+        print(f"✅ {customer_id} の返済記録を保存しました。")
+    except Exception as e:
         print(f"❌ CSV書き込み中にエラーが発生しました: {e}")
 
 # B-11.1 loan_idで貸付情報を検索
@@ -241,11 +261,10 @@ def display_repayment_history(customer_id, filepath='repayments.csv'):
             # 該当する履歴があった場合
             print(f"\n■ 顧客ID: {customer_id} の返済履歴")
             for row in history:
-                # 日付を YYY年MM月DD日 形式に変換
+                # 返済日
                 date_str = datetime.strptime(row['repayment_date'], '%Y-%m-%d').strftime('%Y年%m月%d日')
-
-                # 金額をカンマ区切りに整形
-                amount_str = f"{int(row['amount']):,}円"
+                # 金額
+                amount_str = f"{int(row['repayment_amount']):,}円"
 
                 # 履歴を表示
                 print(f"{date_str}｜{amount_str}")
@@ -353,32 +372,75 @@ def display_unpaid_loans(
 
             if due_str:
                 try:
-                    due = datetime.strptime(due_str, '%Y-%m-%d').date()
-                    due_jp = due.strftime('%Y年%m月%d日')
-                    if due < _today:
-                        status = 'OVERDUE'
+                    # 期日バース
+                    _ = datetime.strptime(due_str, '%Y-%m-%d')  # フォーマット検証用
+                    due_jp = datetime.strptime(due_str, '%Y-%m-%d').date().strftime('%Y年%m月%d日')
 
-                        # --- B-15：CSVの設定で延滞計算 ---
-                        try:
-                            late_base_amount = int(float(loan.get('late_base_amount', amount)))
-                        except ValueError:
-                            late_base_amount = amount
-                        try:
-                            late_rate_percent = float(loan.get('late_fee_rate_dpercent', 10.0))
-                        except ValueError:
-                            late_rate_percent = 10.0
+                    # CSVから延滞用パラメータ
+                    try:
+                        late_base_amount = int(float(loan.get('late_base_amount', amount)))
+                    except ValueError:
+                        late_base_amount = amount
+                    try:
+                        late_rate_percent = float(loan.get('lat_fee_rate_percent', 10.0))
+                    except ValueError:
+                        late_rate_percent = 10.0
+                    grace_days = int(loan.get('grace_period_days', 0))
 
-                        days_late, late_fee = calculate_late_fee(
-                            late_base_amount, 
-                            due,
-                            late_fee_rate_percent=late_rate_percent
-                        )
-                        recovery_amount = expected + late_fee # 🧾 回収額
+                    # ✅ 統一計算：残・延滞日数・延滞手数料・回収額（残＋手数料）
+                    info = compute_recovery_amount(
+                        repayment_expected=expected,
+                        total_repaid=total_repaid,
+                        today=_today,
+                        due_date_str=due_str,
+                        grace_period_days=grace_days,
+                        late_fee_rate_percent=late_rate_percent,
+                        late_base_amount=late_base_amount,
+                    )
+
+                    days_late= info["overdue_days"]
+                    late_fee = info["late_fee"]
+                    remaining = info["remaining"]
+                    recovery_amount = info["recovery_total"]
+                    status = 'OVERDUE' if days_late > 0 else 'UNPAID'
+
                 except ValueError:
                     status = 'DATE_ERR'
-                    due_jp = due_str # 壊れている場合は原文
+                    due_jp = due_str
+
             else:
                 due_jp = due_str
+
+
+            #if due_str:
+                #try:
+                    #due = datetime.strptime(due_str, '%Y-%m-%d').date()
+                   #due_jp = due.strftime('%Y年%m月%d日')
+                    #if due < _today:
+                        #status = 'OVERDUE'
+
+                        # --- B-15：CSVの設定で延滞計算 ---
+                        #try:
+                            #late_base_amount = int(float(loan.get('late_base_amount', amount)))
+                        #except ValueError:
+                            #late_base_amount = amount
+                        #try:
+                            #late_rate_percent = float(loan.get('late_fee_rate_percent', 10.0))
+                        #except ValueError:
+                            #late_rate_percent = 10.0
+
+                        #days_late, late_fee = calculate_late_fee(
+                            #late_base_amount, 
+                            #due,
+                            #late_fee_rate_percent=late_rate_percent
+                        #)
+                        #recovery_amount = expected + late_fee # 🧾 回収額
+                #except ValueError:
+                    #status = 'DATE_ERR'
+                    #due_jp = due_str # 壊れている場合は原文
+            #else:
+                #due_jp = due_str
+
 
             sep = "｜"
             # 延滞行のみ、追加情報を右側に連結
@@ -615,7 +677,7 @@ def extract_overdue_loans(customer_id, loan_file='loan.csv', repayment_file='rep
 
 def calculate_total_repaid_by_loan_id(repayments_file, loan_id):
     """
-    指定された loan_id に対応する累計返済情報を計算して合計値として返す変数。
+    repayments.csv のヘッダー表記ゆれを吸収しつつ、loan_id ごとの累計返済額を合算。
     """
     import csv
 
@@ -623,23 +685,32 @@ def calculate_total_repaid_by_loan_id(repayments_file, loan_id):
     try:
         # ファイルを開く
         with open(repayments_file, mode='r', encoding='utf-8') as file:
-            # 行を辞書として処理
-            reader = csv.DictReader(file)
-            # 各行に対して loan_id の一致チェック
-            for row in reader:
-                if row.get('loan_id') == loan_id:
+            r= csv.reader(file)
+            header = next(r)
+            header = _normalize_repayments_headers(header)  # ★表記ゆれ吸収
+
+            # 必須列がなければ0で返す
+            if "loan_id" not in header or "repayment_amount" not in header:
+                print("[ERROR] repayments.csv のヘッダーに必須列が見つかりません。")
+                return 0
+
+            idx_loan = header.index("loan_id")
+            idx_amt = header.index("repayment_amount")
+
+            for row in r:
+                if len(row) <= max(idx_loan, idx_amt):
+                    continue
+                if row[idx_loan] == loan_id:
                     try:
-                        amount = int(row.get('repayment_amount', '0'))
-                        total += amount
+                        total += int(float(row[idx_amt]))
                     except (ValueError, TypeError):
-                        continue # 金額が不正な場合はスキップ
+                        continue
     except FileNotFoundError:
         print(f"[ERROR] ファイルが見つかりません: {repayments_file}")
         return 0
     except Exception as e:
         print(f"[ERROR] 想定外のエラーが発生しました: {e}")
         return 0
-    
     return total
 
 def get_repayment_expected(loan_id: str, loan_file: str = "loan_v3.csv") -> float:
@@ -663,3 +734,63 @@ def is_loan_fully_repaid(loan_id: str, loan_file: str = "loan_v3.csv", repayment
     total_repaid = calculate_total_repaid_by_loan_id(repayments_file, loan_id)
 
     return total_repaid >= expected
+
+# C-0 （today＋猶予の延滞統一 & 回収額一本化）
+def _parse_date_yyyy_mm_dd(s: str) -> date:
+    return datetime.strptime(s.strip(), "%Y-%m-%d").date()
+
+def calc_overdue_days(today: date, due_date_str: str, grace_period_days: int) -> int:
+    d_due = _parse_date_yyyy_mm_dd(due_date_str)
+    threshold = d_due + timedelta(days=int(grace_period_days or 0))
+    return max(0, (today - threshold).days)
+
+def calc_late_fee(
+        late_base_amount: float,
+        late_fee_rate_percent: float,
+        overdue_days: int,
+        month_days: int = 30
+) -> float:
+    if overdue_days <= 0 or late_base_amount <= 0 or late_fee_rate_percent <= 0:
+        return 0.0
+    return float(late_base_amount) * (float(late_fee_rate_percent) / 100.0) * (overdue_days / month_days)
+
+def _to_float(x, default=0.0):
+    try:
+        return float(x)
+    except Exception:
+        return default
+    
+def compute_remaining_amount(repayment_expected: float, total_repaid: float) -> float:
+    return max(0.0, float(repayment_expected) - float(total_repaid))
+
+def compute_recovery_amount(
+    *,
+    repayment_expected: float,
+    total_repaid: float,
+    today: date,
+    due_date_str: str,
+    grace_period_days: int, 
+    late_fee_rate_percent: float,
+    late_base_amount: float | None = None
+) -> dict:
+    remain = compute_remaining_amount(repayment_expected, total_repaid)
+    base = late_base_amount if late_base_amount is not None else repayment_expected
+    odays = calc_overdue_days(today, due_date_str, grace_period_days)
+    lfee = calc_late_fee(base, late_fee_rate_percent, odays)
+    return{
+        "remaining": round(remain, 2),
+        "late_fee": round(lfee, 2),
+        "recovery_total": round(remain + lfee, 2),
+        "overdue_days": odays,
+    }
+
+def _normalize_repayments_headers(header_row: list[str]) -> list[str]:
+    mapping = {
+        "repayed_amount": "repayment_amount",
+        "repay_amount": "repayment_amount",
+        "loanid": "loan_id",
+        "date": "repayment_date",
+        "payer": "customer_id",
+
+    }
+    return [mapping.get(h.strip(), h.strip()) for h in header_row]
