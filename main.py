@@ -262,7 +262,31 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+        # --- C-0 quick test (一時追加したら終わったら消してOK) ---
+    from datetime import date
+    from modules.loan_module import display_unpaid_loans
+
+    test_customer = "CUST003"
+
+    print("\n[TEST-1] 閾値ちょうど（延滞にならない想定）")
+    display_unpaid_loans(
+        customer_id=test_customer,
+        loan_file="loan_v3.csv",
+        repayment_file="repayments.csv",
+        filter_mode="overdue",
+        today=date(2025, 8, 15)   # due 8/10 + 猶予5日 → 閾値 8/15
+    )
+
+    print("\n[TEST-2] 閾値+1日（延滞になる想定）")
+    display_unpaid_loans(
+        customer_id=test_customer,
+        loan_file="loan_v3.csv",
+        repayment_file="repayments.csv",
+        filter_mode="overdue",
+        today=date(2025, 8, 16)   # 閾値を1日超える
+    )
+
+    #main()
 # ---テスト用（C-0）
     #from datetime import date
     #from modules.loan_module import display_unpaid_loans

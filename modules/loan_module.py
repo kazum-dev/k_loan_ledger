@@ -317,10 +317,11 @@ def display_unpaid_loans(
             if not ds:
                 return False
             try:
-                due = datetime.strptime(ds, '%Y-%m-%d').date()
+                grace_days = int(row.get('grace_period_days', 0))
             except ValueError:
-                return False
-            return due < _today
+                grace_days = 0
+            # ✅ 猶予込みで延滞判定
+            return calc_overdue_days(_today, ds, grace_days) > 0
         
         if filter_mode == 'overdue':
             unpaid = [ln for ln in unpaid if _is_overdue(ln)]
@@ -382,7 +383,7 @@ def display_unpaid_loans(
                     except ValueError:
                         late_base_amount = amount
                     try:
-                        late_rate_percent = float(loan.get('lat_fee_rate_percent', 10.0))
+                        late_rate_percent = float(loan.get('late_fee_rate_percent', 10.0))
                     except ValueError:
                         late_rate_percent = 10.0
                     grace_days = int(loan.get('grace_period_days', 0))
@@ -730,7 +731,7 @@ def is_loan_fully_repaid(loan_id: str, loan_file: str = "loan_v3.csv", repayment
     完了された loan_id の返済が完了しているかどうかを判定する。
     完了 → True、未完了 → False
     """
-    expected = get_repayment_expected(loan_id, loan_file)
+    expected = get_repayment_expected(loan_id, loan_file) # 予定返済額を取得
     total_repaid = calculate_total_repaid_by_loan_id(repayments_file, loan_id)
 
     return total_repaid >= expected
@@ -775,7 +776,7 @@ def compute_recovery_amount(
 ) -> dict:
     remain = compute_remaining_amount(repayment_expected, total_repaid)
     base = late_base_amount if late_base_amount is not None else repayment_expected
-    odays = calc_overdue_days(today, due_date_str, grace_period_days)
+    odays = calc_overdue_days(today, due_date_str, grace_period_days) # 期日 + 猶予日数 を閾値にして延滞日数を返す（マイナスは0で切り上げ）
     lfee = calc_late_fee(base, late_fee_rate_percent, odays)
     return{
         "remaining": round(remain, 2),
