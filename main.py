@@ -18,7 +18,13 @@ import os
 # B-11.1
 from modules.loan_module import register_loan, get_total_repaid_amount, get_loan_info_by_loan_id, is_over_repayment
 
-def loan_registration_mode():
+# C-1
+from modules.utils import (
+    normalize_customer_id, normalize_method, fmt_date,
+    get_project_paths, clean_header_if_quoted, validate_schema
+)
+
+def loan_registration_mode(loans_file):
 
     # 顧客IDの存在を確認
     print("=== 顧客検索＆貸付記録モード ===")
@@ -30,11 +36,7 @@ def loan_registration_mode():
 
     print("\n=== 貸付記録を登録 ===")
     customer_id_input = input("👤顧客IDを入力してください(例：001またはCUST001): ").strip()
-
-    #🔧 入力補正 → 頭に CUST が無ければ付与し、3桁に揃える
-    if not customer_id_input.startswith("CUST"):
-        customer_id_input = "CUST" + customer_id_input.zfill(3)
-
+    customer_id = normalize_customer_id(customer_id_input)
     customer_id = customer_id_input
     valid_ids = get_all_customer_ids() # 登録済み顧客IDの一覧を取得 # 顧客IDの存在チェックに使う
 
@@ -79,14 +81,14 @@ def loan_registration_mode():
         return
     
     # 貸付日を入力
-    loan_date = input("📅貸付日を入力(例：2025-05-05)※未入力なら今日の日付になります: ")
-    if not loan_date:
-        loan_date = datetime.today().strftime("%Y-%m-%d")
+    loan_date = input("📅貸付日を入力(例：2025-05-05)※未入力なら今日の日付になります: ").strip()
+    loan_date = fmt_date(loan_date) or datetime.today().strftime("%Y-%m-%d")
 
     # 返済方法を入力
     repayment_method = input("💳返済方法を入力してください（例：現金／振込）: ").strip()
-    if not repayment_method:
-        repayment_method = "未設定"
+    repayment_method = normalize_method(repayment_method)  # "CASH" 等に標準化
+    if repayment_method == "UNKNOWN":
+        repayment_method = "UNKNOWN"
 
     # ⏳延滞猶予日数を入力
     grace_input = input("⏳延滞猶予日数（日数）を入力してください（例：5) ※未入力なら0日: ").strip()
@@ -108,29 +110,25 @@ def loan_registration_mode():
         return
     # late_fee_rate_percent を loan_module.py の register_loan に渡す
     # デフォルトは 10.0、キーワード引数で渡すことで順番ミスを防ぐ
-    register_loan(customer_id, amount, loan_date, interest_rate_percent=interest_rate, repayment_method=repayment_method,grace_period_days=grace_period_days, late_fee_rate_percent=late_fee_rate_percent, file_path="loan_v3.csv")
+    register_loan(
+        customer_id, amount, loan_date, 
+        interest_rate_percent=interest_rate, 
+        repayment_method=repayment_method,
+        grace_period_days=grace_period_days, 
+        late_fee_rate_percent=late_fee_rate_percent, 
+        file_path=loans_file
+    )
     
-def loan_history_mode():
-
+def loan_history_mode(loans_file):
     print("=== 履歴表示モード ===")
-
     # 顧客IDを入力
-    customer_id = input("👤 顧客IDを入力してください（例：CUST001 または 001）： ").strip().upper()
-
-     # 🔧 入力補正
-    if not customer_id.startswith("CUST"):
-        customer_id = "CUST" + customer_id.zfill(3)
-
-    # 顧客IDを受け取り、その顧客の貸付履歴をCSVから表示する
-    display_loan_history(customer_id, filepath='loan_v3.csv')
+    customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）： ").strip())
+    display_loan_history(customer_id, filepath=loans_file)
 
 # repayment_registration_mode の定義
-def repayment_registration_mode():
+def repayment_registration_mode(loans_file, repayments_file):
 
     print("\n=== 返済記録モード (B-11 新実装）===")
-
-    loans_file = "loan_v3.csv"
-    repayments_file = "repayments.csv"
 
     # repayments.csv がなければ新規作成＆ヘッダー初期化（初回呼び出し時にのみ使用）
     def initialize_repayments_csv():
@@ -207,6 +205,24 @@ def repayment_registration_mode():
     print("✅ 返済記録の登録が完了しました。")
 
 def main():
+    paths = get_project_paths()
+    loans_file = str(paths["loans_csv"])
+    repayments_file = str(paths["repayments_csv"])
+
+    # ヘッダが "col" 形式なら自動で外す（初回だけでOK）
+    clean_header_if_quoted(loans_file)
+    clean_header_if_quoted(repayments_file)
+
+    # 軽いスキーマ検証（足りない時は警告のみ）
+    validate_schema(loans_file,{
+        "loan_id","customer_id","loan_amount","loan_date","due_date",
+        "interest_rate_percent","repayment_expected","repayment_method",
+        "grace_period_days","late_fee_rate_percent","late_base_amount"
+    })
+    validate_schema(repayments_file,{
+        "loan_id","customer_id","repayment_amount","repayment_date"
+    })
+
     # メニューを表示して、どのモードを動かすか選ぶ
     # ユーザーの入力に応じて各モードを呼び出す
     while True:
@@ -223,35 +239,28 @@ def main():
         choice = input("モードを選択してください: ").strip()
 
         if choice =="1":
-            loan_registration_mode()
+            loan_registration_mode(loans_file)
         elif choice == "2":
-            loan_history_mode()
+            loan_history_mode(loans_file)
         elif choice == "3":
-            repayment_registration_mode() #B-11新実装の関数
+            repayment_registration_mode(loans_file, repayments_file) #B-11新実装の関数
         elif choice =='4':
             print("\n=== 返済履歴表示モード ===")
-            customer_id = input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip().upper()
-            if not customer_id.startswith("CUST"):
-                customer_id = "CUST" + customer_id.zfill(3)
-            display_repayment_history(customer_id) # 顧客IDを受け取り、その顧客の返済履歴をCSVから表示する
+            customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
+            display_repayment_history(customer_id, filepath=repayments_file)
         elif choice == "5":
             print("\n=== 残高照会モード ===")
-            customer_id = input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip().upper()
-            if not customer_id.startswith("CUST"):
-                customer_id = "CUST" + customer_id.zfill(3)
-            display_balance(customer_id) # 顧客IDを受け取り、現在の貸付残高を表示する
+            customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
+            display_balance(customer_id)
         elif choice == "9":
             print("\n=== 未返済貸付一覧＋サマリー ===")
-            customer_id = input("👤 顧客IDを入力してください（例：CUST001　または 001）: ").strip().upper()
-            if not customer_id.startswith("CUST"):
-                customer_id = "CUST" + customer_id.zfill(3)
-            display_unpaid_loans(customer_id, filter_mode="all") # 顧客IDを受け取り、まだ返済が済んでいない貸付を一覧表示する
+            customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001　または 001）: ").strip())
+            display_unpaid_loans(customer_id, filter_mode="all", loan_file=loans_file, repayment_file=repayments_file)
         elif choice == "10":
             print("\n=== 延滞貸付一覧表示モード ===")
-            customer_id = input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip().upper()
-            if not customer_id.startswith("CUST"):
-                customer_id = "CUST" + customer_id.zfill(3)
-            display_unpaid_loans(customer_id, filter_mode="overdue") # 顧客IDを受け取り、返済期日を過ぎた貸付だけを表示する
+            customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
+            display_unpaid_loans(customer_id, filter_mode="overdue", 
+                                 loan_file=loans_file, repayment_file=repayments_file)
 
         elif choice == "0":
             print("終了します。")
@@ -262,31 +271,31 @@ def main():
 
 
 if __name__ == "__main__":
-        # --- C-0 quick test (一時追加したら終わったら消してOK) ---
-    from datetime import date
-    from modules.loan_module import display_unpaid_loans
+    # --- C-0 quick test (一時追加したら終わったら消してOK) ---
+    #from datetime import date
+    #from modules.loan_module import display_unpaid_loans
 
-    test_customer = "CUST003"
+    #test_customer = "CUST003"
 
-    print("\n[TEST-1] 閾値ちょうど（延滞にならない想定）")
-    display_unpaid_loans(
-        customer_id=test_customer,
-        loan_file="loan_v3.csv",
-        repayment_file="repayments.csv",
-        filter_mode="overdue",
-        today=date(2025, 8, 15)   # due 8/10 + 猶予5日 → 閾値 8/15
-    )
+    #print("\n[TEST-1] 閾値ちょうど（延滞にならない想定）")
+    #display_unpaid_loans(
+        #customer_id=test_customer,
+        #loan_file=loans_file,
+        #repayment_file="repayments.csv",
+        #filter_mode="overdue",
+        #today=date(2025, 8, 15)   # due 8/10 + 猶予5日 → 閾値 8/15
+    #)
 
-    print("\n[TEST-2] 閾値+1日（延滞になる想定）")
-    display_unpaid_loans(
-        customer_id=test_customer,
-        loan_file="loan_v3.csv",
-        repayment_file="repayments.csv",
-        filter_mode="overdue",
-        today=date(2025, 8, 16)   # 閾値を1日超える
-    )
+    #print("\n[TEST-2] 閾値+1日（延滞になる想定）")
+    #display_unpaid_loans(
+        #customer_id=test_customer,
+        #loan_file=loans_file,
+        #repayment_file="repayments.csv",
+        #filter_mode="overdue",
+        #today=date(2025, 8, 16)   # 閾値を1日超える
+    #)
 
-    #main()
+    main()
 # ---テスト用（C-0）
     #from datetime import date
     #from modules.loan_module import display_unpaid_loans

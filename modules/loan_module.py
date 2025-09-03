@@ -208,11 +208,10 @@ def get_loan_info_by_loan_id(file_path, loan_id):
 # B-11.1 repayments.csvから返済合計を取得
 def get_total_repaid_amount(file_path, loan_id):
     total = 0
-    with open(file_path, newline='', encoding='utf-8') as file:
+    with open(file_path, newline='', encoding='utf-8-sig') as file:
         reader = csv.DictReader(file)
         for row in reader:
             if row['loan_id'] == loan_id:
-                print(f"DEBUG: 加算中 -> {row['repayment_amount']}")
                 total += int(row['repayment_amount'])
     return total
 
@@ -680,14 +679,17 @@ def calculate_total_repaid_by_loan_id(repayments_file, loan_id):
     """
     repayments.csv のヘッダー表記ゆれを吸収しつつ、loan_id ごとの累計返済額を合算。
     """
-    import csv
-
     total = 0
     try:
         # ファイルを開く
-        with open(repayments_file, mode='r', encoding='utf-8') as file:
+        with open(repayments_file, mode='r', encoding='utf-8-sig', newline='') as file:
             r= csv.reader(file)
-            header = next(r)
+            header = next(r, None)
+            if not header:
+                print("[ERROR] repayments.csv が空です。")
+                return 0
+            # BOM/引用符/空白を除去
+            header = [h.lstrip("\ufeff").strip().strip('"') for h in header]
             header = _normalize_repayments_headers(header)  # ★表記ゆれ吸収
 
             # 必須列がなければ0で返す
@@ -720,10 +722,8 @@ def get_repayment_expected(loan_id: str, loan_file: str = "loan_v3.csv") -> floa
     """
     df = pd.read_csv(loan_file)
     row = df[df["loan_id"] == loan_id]
-
     if row.empty:
-        raise ValueError(f"[ERROR] loan_id '{loan_id} がloan_v3.csv に存在しません。")
-    
+        raise ValueError(f"[ERROR] loan_id '{loan_id}' がloan_v3.csv に存在しません。")    
     return float(row.iloc[0]["repayment_expected"])
 
 def is_loan_fully_repaid(loan_id: str, loan_file: str = "loan_v3.csv", repayments_file: str = "repayments.csv") -> bool:
