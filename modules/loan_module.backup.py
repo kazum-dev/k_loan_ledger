@@ -2,7 +2,6 @@ import csv
 import os
 import pandas as pd
 from datetime import date, datetime, timedelta
-from modules.utils import get_project_paths
 
 # 日付ごとにユニークな loan_id を生成する関数
 def generate_loan_id(file_path, loan_date=None):
@@ -34,21 +33,7 @@ def generate_loan_id(file_path, loan_date=None):
 # main.py から新規貸付データを受け取り CSV に保存する関数
 # late_fee_rate_percent は延滞利率（％）
 # デフォルトは10.0
-def register_loan(
-    customer_id,
-    amount,
-    loan_date,
-    due_date=None,
-    interest_rate_percent=10.0,
-    repayment_method="未設定",
-    grace_period_days=0,
-    late_fee_rate_percent=10,
-    file_path=None,     # ← ここを None に
-):
-    # === 追加: パス自動解決 ===
-    if not file_path:
-        paths = get_project_paths()
-        file_path = str(paths["loans_csv"])
+def register_loan(customer_id, amount, loan_date, due_date=None, interest_rate_percent=10.0, repayment_method="未設定", grace_period_days=0, late_fee_rate_percent=10, file_path="loan_v3.csv"):
     
     # 利率と延滞利率を受信したことを表示
     print(f"[DEBUG] 利率受信: {interest_rate_percent}")

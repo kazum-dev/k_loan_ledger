@@ -37,8 +37,8 @@ def loan_registration_mode(loans_file):
     print("\n=== 貸付記録を登録 ===")
     customer_id_input = input("👤顧客IDを入力してください(例：001またはCUST001): ").strip()
     customer_id = normalize_customer_id(customer_id_input)
-    customer_id = customer_id_input
-    valid_ids = get_all_customer_ids() # 登録済み顧客IDの一覧を取得 # 顧客IDの存在チェックに使う
+
+    valid_ids = {normalize_customer_id(x) for x in get_all_customer_ids()}
 
     if customer_id not in valid_ids:
         print("❌ 顧客IDが存在しません。先に顧客登録を行ってください。")
