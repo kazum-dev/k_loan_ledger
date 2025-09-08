@@ -23,6 +23,11 @@ from modules.utils import (
     normalize_customer_id, normalize_method, fmt_date,
     get_project_paths, clean_header_if_quoted, validate_schema
 )
+from modules.logger import get_logger
+from modules.audit import append_audit
+    
+# グローバル・ロガー （二重出力しないようモジュールレベルで生成）
+logger = get_logger("k_loan_ledger")
 
 def loan_registration_mode(loans_file):
 
@@ -209,6 +214,10 @@ def main():
     loans_file = str(paths["loans_csv"])
     repayments_file = str(paths["repayments_csv"])
 
+    # 起動ログ監査
+    logger.info("App boot")
+    append_audit("START", "app", "session", {"cwd": os.getcwd()}, actor="CLI")
+
     # ヘッダが "col" 形式なら自動で外す（初回だけでOK）
     clean_header_if_quoted(loans_file)
     clean_header_if_quoted(repayments_file)
@@ -225,50 +234,63 @@ def main():
 
     # メニューを表示して、どのモードを動かすか選ぶ
     # ユーザーの入力に応じて各モードを呼び出す
-    while True:
-        print("=== K's Loan Ledger ===")
-        print("1: 貸付記録モード")
-        print("2: 貸付履歴表示モード")
-        print("3: 返済記録モード")
-        print("4: 返済履歴表示モード")
-        print("5: 残高照会モード")
-        print("9: 未返済サマリー表示（テスト用）")
-        print("10: 延滞貸付表示モード")
-        print("0: 終了")
+    try:
+        while True:
+            print("=== K's Loan Ledger ===")
+            print("1: 貸付記録モード")
+            print("2: 貸付履歴表示モード")
+            print("3: 返済記録モード")
+            print("4: 返済履歴表示モード")
+            print("5: 残高照会モード")
+            print("9: 未返済サマリー表示（テスト用）")
+            print("10: 延滞貸付表示モード")
+            print("0: 終了")
 
-        choice = input("モードを選択してください: ").strip()
+            choice = input("モードを選択してください: ").strip()
+            logger.info(f"Menu selected: {choice}")
+            if choice =="1":
+                append_audit("ENTER", "mode", "loan_registration", None)
+                loan_registration_mode(loans_file)
+            elif choice == "2":
+                append_audit("ENTER", "mode", "repayment_registration", None)
+                loan_history_mode(loans_file)
+            elif choice == "3":
+                append_audit("ENTER", "mode", "repayment_registration", None)
+                repayment_registration_mode(loans_file, repayments_file) #B-11新実装の関数
+            elif choice =='4':
+                append_audit("ENTER", "mode", "repayment_history", None)
+                print("\n=== 返済履歴表示モード ===")
+                customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
+                display_repayment_history(customer_id, filepath=repayments_file)
+            elif choice == "5":
+                append_audit("ENTER", "mode", "balance", None)
+                print("\n=== 残高照会モード ===")
+                customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
+                display_balance(customer_id)
+            elif choice == "9":
+                append_audit("ENTER", "mode", "unpaid_summary", None)
+                print("\n=== 未返済貸付一覧＋サマリー ===")
+                customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001　または 001）: ").strip())
+                display_unpaid_loans(customer_id, filter_mode="all", loan_file=loans_file, repayment_file=repayments_file)
+            elif choice == "10":
+                append_audit("ENTER", "mode", "overdue_list", None)
+                print("\n=== 延滞貸付一覧表示モード ===")
+                customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
+                display_unpaid_loans(customer_id, filter_mode="overdue", 
+                                    loan_file=loans_file, repayment_file=repayments_file)
 
-        if choice =="1":
-            loan_registration_mode(loans_file)
-        elif choice == "2":
-            loan_history_mode(loans_file)
-        elif choice == "3":
-            repayment_registration_mode(loans_file, repayments_file) #B-11新実装の関数
-        elif choice =='4':
-            print("\n=== 返済履歴表示モード ===")
-            customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
-            display_repayment_history(customer_id, filepath=repayments_file)
-        elif choice == "5":
-            print("\n=== 残高照会モード ===")
-            customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
-            display_balance(customer_id)
-        elif choice == "9":
-            print("\n=== 未返済貸付一覧＋サマリー ===")
-            customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001　または 001）: ").strip())
-            display_unpaid_loans(customer_id, filter_mode="all", loan_file=loans_file, repayment_file=repayments_file)
-        elif choice == "10":
-            print("\n=== 延滞貸付一覧表示モード ===")
-            customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
-            display_unpaid_loans(customer_id, filter_mode="overdue", 
-                                 loan_file=loans_file, repayment_file=repayments_file)
-
-        elif choice == "0":
-            print("終了します。")
-            break
-        
-        else:
-            print("❌ 無効な選択肢です。もう一度入力してください。")
-
+            elif choice == "0":
+                print("終了します。")
+                append_audit("END", "app", "session", {"status": "OK"}, actor="CLI")
+                logger.info("App shutdown (user exit)")
+                break
+            
+            else:
+                print("❌ 無効な選択肢です。もう一度入力してください。")
+    except Exception as e:
+        logger.error(f"Unhandled error: {e}", exc_info=True)
+        append_audit("ERROR", "app", "session", {"error": str(e)}, actor="CLI")
+        raise
 
 if __name__ == "__main__":
     # --- C-0 quick test (一時追加したら終わったら消してOK) ---
