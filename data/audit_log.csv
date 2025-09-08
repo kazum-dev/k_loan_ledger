@@ -1,3 +1,0 @@
-timestamp_utc,action,entity,entity_id,actor,details
-2025-09-08T03:58:24Z,START,app,session,CLI,"{""cwd"": ""C:\\Users\\kazum\\.vscode\\k_loan_ledger""}"
-2025-09-08T03:58:27Z,END,app,session,CLI,"{""status"": ""OK""}"
