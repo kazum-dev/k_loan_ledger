@@ -3,6 +3,10 @@ import os
 import pandas as pd
 from datetime import date, datetime, timedelta
 from modules.utils import get_project_paths
+from decimal import Decimal, ROUND_HALF_UP, getcontext
+from enum import Enum
+from modules.utils import normalize_method  # 既存の正規化（文字列）を再利用
+getcontext().prec = 28 
 
 # 日付ごとにユニークな loan_id を生成する関数
 def generate_loan_id(file_path, loan_date=None):
@@ -30,6 +34,49 @@ def generate_loan_id(file_path, loan_date=None):
 
     # ローンIDを生成（例：L20250707-003）
     return f"{prefix}{str(counter).zfill(3)}"
+
+# 返済方法 ENUM（内部表現を固定）
+class RepaymentMethod(Enum):
+    CASH = "CASH"
+    BANK_TRANSFER = "BANK_TRANSFER"
+    UNKOWN = "UNKNOWN"
+
+def _normalize_method_to_enum(value: str | None) -> RepaymentMethod:
+    """
+    utils.normalize_method (→ "CASH"/"BANK_TRANSFER"/"UNKNOWN" を返す前提)
+    を受けて Enum にマッピング。None/空は UNKNOWN。
+    """
+    try:
+        s = normalize_method(value or "")
+    except Exception:
+        s = "UNKNOWN"
+    mapping = {
+        "CASH": RepaymentMethod.CASH,
+        "BANK_TRANSFER": RepaymentMethod.BANK_TRANSFER,
+        "UNKNOWN": RepaymentMethod.UNKOWN,
+    }
+    return mapping.get(s, RepaymentMethod.UNKOWN)
+
+def round_money(amount: Decimal | int | float, *, unit: int = 1) -> int:
+    """
+    日本円の四捨五入。unitで10円/100円丸めにも対応（規定1円）。
+    """
+    if unit not in(1, 10, 100, 1000):
+        raise ValueError("unit must be 1/10/100/1000")
+    d = Decimal(str(amount)) / Decimal(unit)
+    y = d.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+    return int(y * unit)
+
+def calc_repayment_expected(amount: int | float | Decimal,
+                            interest_rate_percent: float | Decimal,
+                            *, round_unit: int = 1) -> int:
+    """
+    予定返済額 = round_money( amount * (1+ 利率/100) )
+    """
+    base = Decimal(str(amount))
+    rate = Decimal(str(interest_rate_percent)) / Decimal("100")
+    raw = base * (Decimal("1") + rate)
+    return round_money(raw, unit=round_unit)
 
 # main.py から新規貸付データを受け取り CSV に保存する関数
 # late_fee_rate_percent は延滞利率（％）
@@ -78,8 +125,8 @@ def register_loan(
     if due_date is None or due_date == "": 
         due_date =  (datetime.strptime(loan_date, "%Y-%m-%d") + timedelta(days=30)).strftime("%Y-%m-%d") 
 
-    # 予定返済額（repayment_expected）を自動計算（整数に丸める）
-    repayment_expected = int(amount * (1 + interest_rate_percent / 100))
+    # 予定返済額 (Decimalベースで四捨五入。将来は round_unit=10/100 にも対応可)
+    repayment_expected = calc_repayment_expected(amount, interest_rate_percent, round_unit=1)
     print(f"[DEBUG] 自動計算された予定返済額: {repayment_expected}")
 
     # 延滞対象元金を初期設定（amount をコピー）
@@ -88,6 +135,9 @@ def register_loan(
 
     # ユニークな loan_id を生成
     loan_id = generate_loan_id(file_path, loan_date)
+
+    # 返済方法をENUM化に正規化（内部統一）
+    method_enum = _normalize_method_to_enum(repayment_method)
 
     try:
         # ファイルが存在しない or 空なら header を w モードで書く
@@ -100,8 +150,13 @@ def register_loan(
         with open(file_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             # 保存する内容をデバック出力
-            print("[DEBUG] 保存内容：", [loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, repayment_method, grace_period_days, late_fee_rate_percent, late_base_amount])
-            writer.writerow([loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, repayment_method ,grace_period_days, late_fee_rate_percent, late_base_amount])
+            print("[DEBUG] 保存内容：", [loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, method_enum.value, grace_period_days, late_fee_rate_percent, late_base_amount])
+            writer.writerow([
+                loan_id, customer_id, amount, loan_date, due_date, 
+                interest_rate_percent, repayment_expected, 
+                method_enum.value,
+                grace_period_days, late_fee_rate_percent, late_base_amount
+            ])
         
         # 保存成功メッセージ
         print("✅貸付記録が保存されました。")
