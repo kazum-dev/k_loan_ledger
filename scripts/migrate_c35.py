@@ -159,42 +159,41 @@ def migrate(csv_path: Path, dry_run: bool, no_backup: bool, backup_dir: Path, fa
         # Method normalize
         before_m = row["repayment_method"]
         after_m = normalize_method(before_m, mapping)
+
         if after_m not in {"CASH","BANK_TRANSFER","UNKNOWN"}:
             # Shouldn't happen, but guard
             counters.warnings += 1
             after_m = "UNKNOWN"
+
         if after_m != before_m:
             counters.method_changed += 1
-            append_audit_row(run_id, loan_id, "repayment_method", before_m, after_m, "method_normalized", options, operator)
+            append_audit_row(run_id, loan_id, "repayment_method", before_m, after_m, 
+                             "method_normalized", options, operator)
+            append_audit_row(run_id, loan_id, "repayment_method", before_m, after_m, 
+                             "method_normalized", options, operator)
+            append_local_migration_audit(run_id, loan_id, "repayment_method", before_m, after_m, 
+                                         "method_normalized", options, operator)
             row["repayment_method"] = after_m
 
-        append_audit_row(run_id, loan_id, "repayment_method", before_m, after_m, "method_normalized", options, operator)
-        append_local_migration_audit(run_id, loan_id, "repayment_method", before_m, after_m, "method_normalized", options, operator)
-
         # Expected recalc
-        try:
-            new_expected = recalc_expected(row["loan_amount"], row["interest_rate_percent"])
-        except Exception as e:
-            counters.errors += 1
-            logger.error(f"[{loan_id}] expected recalc error: {e}")
-            continue
+        
+        new_expected = recalc_expected(row["loan_amount"], row["interest_rate_percent"])
 
         before_e = row["repayment_expected"]
         try:
             before_e_int = int(before_e)
         except Exception:
             counters.warnings += 1
-            before_e_int = new_expected  # force update
+            before_e_int = new_expected
 
         if new_expected != before_e_int:
             counters.expected_changed += 1
-            append_audit_row(run_id, loan_id, "repayment_expected", before_e, new_expected, "expected_recalculated", options, operator)
+            append_audit_row(run_id, loan_id, "repayment_expected", before_e, new_expected, 
+                             "expected_recalculated", options, operator)
+            append_local_migration_audit(run_id, loan_id, "repayment_expected", before_e, new_expected, 
+                                         "expected_recalculated", options, operator)
             row["repayment_expected"] = str(new_expected)
-
-        append_audit_row(run_id, loan_id, "repayment_expected", before_e, new_expected, "expected_recalculated", options, operator)
-        append_local_migration_audit(run_id, loan_id, "repayment_expected", before_e, new_expected, "expected_recalculated", options, operator)
-
-
+        
     # Write CSV
     if not dry_run:
         with csv_path.open("w", encoding="utf-8", newline="") as f:
