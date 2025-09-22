@@ -17,6 +17,9 @@ from datetime import datetime, timezone
 import sys
 import json
 
+from tempfile import NamedTemporaryFile
+import os
+
 # 追加（ファイル先頭の imports 付近に）
 from pathlib import Path
 from datetime import datetime, timezone
@@ -195,11 +198,23 @@ def migrate(csv_path: Path, dry_run: bool, no_backup: bool, backup_dir: Path, fa
             row["repayment_expected"] = str(new_expected)
         
     # Write CSV
-    if not dry_run:
-        with csv_path.open("w", encoding="utf-8", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
+    def atomic_write_csv(csv_path, fieldnames, rows):
+        tmp = NamedTemporaryFile("w", encoding="utf-8", newline="", delete=False, dir=str(csv_path.parent))
+        tmp_path = Path(tmp.name)
+        try:
+            writer = csv.DictWriter(tmp, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(rows)
+            tmp.close()
+            os.replace(tmp_path, csv_path)  # 同一FSなら実質アトミック
+        finally:
+            if tmp_path.exists():
+                try: tmp_path.unlink()
+                except: pass
+
+# 既存の「if not dry_run: ... writer = csv.DictWriter(...」の塊をこれに置き換え
+    if not dry_run:
+        atomic_write_csv(csv_path, fieldnames, rows)
 
     # Summary
     logger.info(f"[C-3.5] total={counters.total} method_changed={counters.method_changed} expected_changed={counters.expected_changed} warnings={counters.warnings} errors={counters.errors} backup={backup_path}")
