@@ -17,6 +17,27 @@ from datetime import datetime, timezone
 import sys
 import json
 
+# 追加（ファイル先頭の imports 付近に）
+from pathlib import Path
+from datetime import datetime, timezone
+import csv as _csv  # 既存の csv と衝突しないよう別名でもOK
+
+def append_local_migration_audit(run_id: str, loan_id: str, field: str, before, after, reason: str, options: str, operator: str):
+    """
+    Always write C-3.5 audit to data/migration_audit.csv (project-local)
+    regardless of project-specific audit module behavior.
+    """
+    out = Path("data") / "migration_audit.csv"
+    out.parent.mkdir(parents=True, exist_ok=True)
+    header = ["run_id","timestamp","loan_id","field","before","after","reason","options","operator"]
+    ts = datetime.now(timezone.utc).astimezone().isoformat()
+    write_header = not out.exists()
+    with out.open("a", encoding="utf-8", newline="") as f:
+        w = _csv.writer(f)
+        if write_header:
+            w.writerow(header)
+        w.writerow([run_id, ts, loan_id, field, before, after, reason, options, operator])
+
 # Optional imports for project logger/audit; fallback to stdout if not found
 try:
     from modules.logger import get_logger  # type: ignore
@@ -147,6 +168,9 @@ def migrate(csv_path: Path, dry_run: bool, no_backup: bool, backup_dir: Path, fa
             append_audit_row(run_id, loan_id, "repayment_method", before_m, after_m, "method_normalized", options, operator)
             row["repayment_method"] = after_m
 
+        append_audit_row(run_id, loan_id, "repayment_method", before_m, after_m, "method_normalized", options, operator)
+        append_local_migration_audit(run_id, loan_id, "repayment_method", before_m, after_m, "method_normalized", options, operator)
+
         # Expected recalc
         try:
             new_expected = recalc_expected(row["loan_amount"], row["interest_rate_percent"])
@@ -166,6 +190,10 @@ def migrate(csv_path: Path, dry_run: bool, no_backup: bool, backup_dir: Path, fa
             counters.expected_changed += 1
             append_audit_row(run_id, loan_id, "repayment_expected", before_e, new_expected, "expected_recalculated", options, operator)
             row["repayment_expected"] = str(new_expected)
+
+        append_audit_row(run_id, loan_id, "repayment_expected", before_e, new_expected, "expected_recalculated", options, operator)
+        append_local_migration_audit(run_id, loan_id, "repayment_expected", before_e, new_expected, "expected_recalculated", options, operator)
+
 
     # Write CSV
     if not dry_run:
