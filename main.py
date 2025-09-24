@@ -29,6 +29,11 @@ from modules.audit import append_audit
 # グローバル・ロガー （二重出力しないようモジュールレベルで生成）
 logger = get_logger("k_loan_ledger")
 
+# 共通関数：モード突入時の技術ログ + 監査ログをセットで残す
+def enter_mode(mode_name: str):
+    logger.info(f"Enter mode: {mode_name}")
+    append_audit("ENTER", "mode", mode_name, None)
+
 def loan_registration_mode(loans_file):
 
     # 顧客IDの存在を確認
@@ -249,34 +254,40 @@ def main():
             choice = input("モードを選択してください: ").strip()
             logger.info(f"Menu selected: {choice}")
             if choice =="1":
-                append_audit("ENTER", "mode", "loan_registration", None)
+                enter_mode("loan_registration")
                 loan_registration_mode(loans_file)
+
             elif choice == "2":
-                append_audit("ENTER", "mode", "repayment_registration", None)
+                enter_mode("loan_history")
                 loan_history_mode(loans_file)
+
             elif choice == "3":
-                append_audit("ENTER", "mode", "repayment_registration", None)
-                repayment_registration_mode(loans_file, repayments_file) #B-11新実装の関数
+                enter_mode("repayment_registration")
+                repayment_registration_mode(loans_file, repayments_file)  # B-11 新実装
+
             elif choice =='4':
-                append_audit("ENTER", "mode", "repayment_history", None)
+                enter_mode("repayment_history")
                 print("\n=== 返済履歴表示モード ===")
                 customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
                 display_repayment_history(customer_id, filepath=repayments_file)
+
             elif choice == "5":
-                append_audit("ENTER", "mode", "balance", None)
+                enter_mode("balance_inquiry")
                 print("\n=== 残高照会モード ===")
                 customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
                 display_balance(customer_id)
+
             elif choice == "9":
-                append_audit("ENTER", "mode", "unpaid_summary", None)
+                enter_mode("unpaid_summary")
                 print("\n=== 未返済貸付一覧＋サマリー ===")
                 customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001　または 001）: ").strip())
                 display_unpaid_loans(customer_id, filter_mode="all", loan_file=loans_file, repayment_file=repayments_file)
+
             elif choice == "10":
-                append_audit("ENTER", "mode", "overdue_list", None)
+                enter_mode("overdue_loans")
                 print("\n=== 延滞貸付一覧表示モード ===")
                 customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
-                display_unpaid_loans(customer_id, filter_mode="overdue", 
+                display_unpaid_loans(customer_id, filter_mode="overdue",
                                     loan_file=loans_file, repayment_file=repayments_file)
 
             elif choice == "0":

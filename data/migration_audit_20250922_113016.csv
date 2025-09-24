@@ -1,0 +1,20 @@
+run_id,timestamp,loan_id,field,before,after,reason,options,operator
+C35RUN-20250922-110216,2025-09-22T11:02:16.252307+09:00,L20250801-001,repayment_method,現金,CASH,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.253268+09:00,L20250801-001,repayment_expected,11000,11000,expected_recalculated,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.253964+09:00,L20250905-001,repayment_method,UNKNOWN,UNKNOWN,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.254653+09:00,L20250905-001,repayment_expected,1100,1100,expected_recalculated,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.286429+09:00,L20250905-002,repayment_method,UNKNOWN,UNKNOWN,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.287316+09:00,L20250905-002,repayment_expected,1100,1100,expected_recalculated,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.287942+09:00,L20250912-001,repayment_method,CASH,CASH,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.288568+09:00,L20250912-001,repayment_expected,11000,11000,expected_recalculated,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.289167+09:00,L20250915-001,repayment_method,CASH,CASH,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.289847+09:00,L20250915-001,repayment_expected,1100,1100,expected_recalculated,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.290568+09:00,L20250915-002,repayment_method,BANK_TRANSFER,BANK_TRANSFER,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.291304+09:00,L20250915-002,repayment_expected,1650,1650,expected_recalculated,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.291892+09:00,L20250915-003,repayment_method,BANK_TRANSFER,BANK_TRANSFER,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.292581+09:00,L20250915-003,repayment_expected,2200,2200,expected_recalculated,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.293177+09:00,L20250915-004,repayment_method,CASH,CASH,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.293765+09:00,L20250915-004,repayment_expected,2750,2750,expected_recalculated,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.294332+09:00,L20250917-001,repayment_method,UNKNOWN,UNKNOWN,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-110216,2025-09-22T11:02:16.294924+09:00,L20250917-001,repayment_expected,1100,1100,expected_recalculated,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-111830,2025-09-22T11:18:30.755311+09:00,L20250801-001,repayment_method,現金,CASH,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K

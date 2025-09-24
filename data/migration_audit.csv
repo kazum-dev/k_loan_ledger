@@ -1,0 +1,6 @@
+run_id,timestamp,loan_id,field,before,after,reason,options,operator
+C35RUN-20250922-113042,2025-09-22T11:30:42.979859+09:00,T-0001,repayment_method,銀行振込,BANK_TRANSFER,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-113042,2025-09-22T11:30:42.980962+09:00,T-0002,repayment_method,手渡し,CASH,method_normalized,"dry_run=True, no_backup=False, backup_dir=data",K
+C35RUN-20250922-114725,2025-09-22T11:47:25.973216+09:00,T-0001,repayment_method,銀行振込,BANK_TRANSFER,method_normalized,"dry_run=False, no_backup=False, backup_dir=data",K
+C35RUN-20250922-114725,2025-09-22T11:47:25.974260+09:00,T-0002,repayment_method,手渡し,CASH,method_normalized,"dry_run=False, no_backup=False, backup_dir=data",K
+C35RUN-20250922-114847,2025-09-22T11:48:47.361711+09:00,L20250801-001,repayment_method,現金,CASH,method_normalized,"dry_run=False, no_backup=False, backup_dir=data",K
