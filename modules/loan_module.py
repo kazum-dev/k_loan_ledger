@@ -39,7 +39,8 @@ def generate_loan_id(file_path, loan_date=None):
 class RepaymentMethod(Enum):
     CASH = "CASH"
     BANK_TRANSFER = "BANK_TRANSFER"
-    UNKOWN = "UNKNOWN"
+    UNKNOWN = "UNKNOWN"
+    UNKOWN = "UNKNOWN" # backward-compat alias(一時的に残す)
 
 def _normalize_method_to_enum(value: str | None) -> RepaymentMethod:
     """
@@ -53,9 +54,9 @@ def _normalize_method_to_enum(value: str | None) -> RepaymentMethod:
     mapping = {
         "CASH": RepaymentMethod.CASH,
         "BANK_TRANSFER": RepaymentMethod.BANK_TRANSFER,
-        "UNKNOWN": RepaymentMethod.UNKOWN,
+        "UNKNOWN": RepaymentMethod.UNKNOWN,
     }
-    return mapping.get(s, RepaymentMethod.UNKOWN)
+    return mapping.get(s, RepaymentMethod.UNKNOWN)
 
 def round_money(amount: Decimal | int | float, *, unit: int = 1) -> int:
     """

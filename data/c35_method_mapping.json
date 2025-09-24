@@ -1,0 +1,26 @@
+{
+  "現金": "CASH",
+  "げんきん": "CASH",
+  "手渡し": "CASH",
+  "キャッシュ": "CASH",
+  "現金(手渡し)": "CASH",
+  "現金（手渡し）": "CASH",
+  "現金手渡し": "CASH",
+  "ＣＡＳＨ": "CASH",
+
+  "振込": "BANK_TRANSFER",
+  "振り込み": "BANK_TRANSFER",
+  "ふりこみ": "BANK_TRANSFER",
+  "銀行振込": "BANK_TRANSFER",
+  "口座振込": "BANK_TRANSFER",
+  
+  "CASH": "CASH",
+  "BANK_TRANSFER": "BANK_TRANSFER",
+  "ｂａｎｋ＿ｔｒａｎｓｆｅｒ": "BANK_TRANSFER", 
+  "ＢＡＮＫ＿ＴＲＡＮＳＦＥＲ": "BANK_TRANSFER",
+  "UNKNOWN": "UNKNOWN",
+  "": "UNKNOWN",
+  "空": "UNKNOWN",
+  "未設定": "UNKNOWN",
+  "不明": "UNKNOWN"
+}
