@@ -161,9 +161,32 @@ def register_loan(
         
         # 保存成功メッセージ
         print("✅貸付記録が保存されました。")
+
+        # ★C-4 監査フック（成功時のみ）
+        try:
+            append_audit(
+                event="REGISTER_LOAN",
+                loan_id=loan_id,
+                amount=amount,
+                meta={
+                    "customer_id": customer_id,
+                    "loan_date": loan_date,
+                    "due_date": due_date,
+                    "interest_rate_percent": interest_rate_percent,
+                    "repayment_expected": repayment_expected,
+                    "repayment_method": method_enum.value,
+                    "grace_period_days": grace_period_days,
+                    "late_fee_rate_percent": late_fee_rate_percent,
+                    "late_base_amount": late_base_amount, 
+                },
+                actor="user"
+            )
+        except Exception as _e:
+            # エラーが起きた場合はメッセージを表示
+            print(f"[WARN] append_audit で警告: {_e}")
+
     except Exception as e:
-        # エラーが起きた場合はメッセージを表示
-        print(f"❌エラーが発生しました: {e}")
+        print(f"❌ エラーが発生しました: {e}")
 
 # 顧客IDごとの貸付履歴を表示する関数
 def display_loan_history(customer_id, filepath):
@@ -264,6 +287,22 @@ def register_repayment():
                 "repayment_date": repayment_date
             })
         print(f"✅ {customer_id} の返済記録を保存しました。")
+
+        # ★C-4 監査フック（成功時のみ）
+        try:
+            append_audit(
+                event="REGISTER_REPAYMENT",
+                loan_id=loan_id,
+                amount=amount,
+                meta={
+                    "customer_id": customer_id,
+                    "paid_date": repayment_date
+                },
+                actor="user"
+            )
+        except Exception as _e:
+            print(f"[WARN] append_audit で警告: {_e}")
+    
     except Exception as e:
         print(f"❌ CSV書き込み中にエラーが発生しました: {e}")
 
@@ -647,24 +686,54 @@ def display_unpaid_loans_old(customer_id, loan_file='loan.csv', repayment_file='
         # 想定外のエラーが発生した場合
         print(f"❌ エラーが発生しました: {e}")
 
-from datetime import date
-
 # 延滞日数と延滞手数料を計算する関数
-def calculate_late_fee(principal, due_date, *, late_fee_rate_percent: float = 10.0):
+import warnings
+
+def calculate_late_fee(
+        principal, 
+        due_date, 
+        *, 
+        late_fee_rate_percent: float = 10.0,
+        **kwargs
+    ):
+
     """
-    月利(late_fee_rate_percent %）を (月利/30) の日割りで計算。
-    - principal: 延滞対象元金(CSV の late_base_amount を想定)
-    - due_date: 返済期日 (date)
-    - late_fee_rate_percent: 月利 (%)　デフォルト10.0
-    return: (days_late, late_fee)
+    DEPECATED: 互換ラッパー。戻り値は (days_late, late_fee_int) を維持。
+    旧コードの呼び出しを壊さず、新ロジックへ譲渡します。
+
+    追加で受け付ける任意引数（互換目的）：
+    - grace_period_days: int = 0 (旧仕様は猶予なし。ここで0を規定にして互換を維持)
+    - month_days: int = 30 (1ヶ月の日数とみなす)
+    - late_base_amount: float = principal (延滞手数料の計算ベース)
     """
-    today = date.today()
-    if due_date < today:
-        days_late = (today - due_date).days
-        daily_late_rate = (float(late_fee_rate_percent) / 100.0) / 30.0
-        late_fee = round(int(principal) * daily_late_rate * days_late)
-        return days_late, late_fee
-    return 0, 0
+    warnings.warn(
+        "calculate_late_fee is deprecated. Use compute_recovery_amount / calc_late_fee.",
+        DeprecationWarning, stacklevel=2
+    )
+
+    # due_date は　date でも　'YYYY-MM-DD' でもOKにする
+    if isinstance(due_date, str):
+        due = _parse_date_yyyy_mm_dd(due_date)
+    else:
+        due = due_date
+
+    # 旧API互換の規定値（挙動を変えないため grace は 0 が規定）
+    grace = int(kwargs.get("grace_period_days",0))
+    month_days = int(kwargs.get("month_days", 30))
+    base_amount = float(kwargs.get("late_base_amount", principal))
+
+    # 延滞日数（猶予は規定0。　将来、設定値に寄せたいときはここで default_grace を読む）
+    today_ = date.today()
+    overdue_days = calc_overdue_days(today_, due.isoformat(), grace)
+
+    # 新ロジックで手数料を算出
+    fee = calc_late_fee(
+        late_base_amount=base_amount,
+        late_fee_rate_percent=float(late_fee_rate_percent),
+        overdue_days=overdue_days,
+        month_days=month_days
+    )
+    return overdue_days, int(round(fee))
     
 
 # 延滞中の貸付を抽出して表示する関数
@@ -866,3 +935,60 @@ def _normalize_repayments_headers(header_row: list[str]) -> list[str]:
 
     }
     return [mapping.get(h.strip(), h.strip()) for h in header_row]
+
+# C-4 猶予付き延滞判定（effective_due）
+
+DATE_FMT = "%Y-%m-%d"
+
+def _parse_date(s: str) -> datetime.date:
+    return datetime.strptime(s, DATE_FMT).date()
+
+def _to_int(x, fallback=0) -> int:
+    try:
+        return int(x)
+    except (TypeError, ValueError):
+        return fallback
+    
+def compute_effective_due(due_date_str: str, grace_days) -> datetime.date:
+    """due_date + grace_period_days を返す。grace_daysは欠損/不正なら0扱い。"""
+    due = _parse_date(due_date_str)
+    gd = _to_int(grace_days, 0)
+    if gd < 0:  # マイナスは0に矯正（仕様上、猶予は負にしない）
+        gd = 0
+    return due + timedelta(days=gd)
+
+def is_overdue_with_grace(today: date, 
+                          due_date_str: str,
+                          garce_period_days) -> bool:
+    return today > compute_effective_due(due_date_str, garce_period_days)
+
+# C-4 監査ログ append_audit()
+import json
+
+AUDIT_PATH = "data/audit_log.csv"
+AUDIT_HEADERS = ["ts", "event", "loan_id", "amount", "meta", "actor"]
+
+def append_audit(event: str, 
+                 loan_id: str,
+                 amount: float | int | None = None,
+                 meta: dict | None = None,
+                 actor: str = "system") -> None:
+    """
+    監査イベントをCSVに追記。
+    """
+    os.makedirs(os.path.dirname(AUDIT_PATH), exist_ok=True)
+    file_exists = os.path.exists(AUDIT_PATH)
+    row = {
+        "ts": datetime.now().isoformat(timespec="seconds"),
+        "event": event, 
+        "loan_id": str(loan_id) if loan_id is not None else "", 
+        "amount": amount if amount is not None else "",
+        "meta": json.dumps(meta, ensure_ascii=False) if meta else "",
+        "actor": actor,
+    }
+    with open(AUDIT_PATH, "a", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=AUDIT_HEADERS)
+        if not file_exists:
+            w.writeheader()
+        w.writerow(row)
+

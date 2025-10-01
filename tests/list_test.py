@@ -1,22 +1,10 @@
-import csv
+from datetime import date
+from modules.loan_module import register_loan, display_unpaid_loans
 
-def list_customers():
-    try:
-        with open('customers.csv',mode='r',newline='',encoding='utf-8') as file:
-            reader = csv.reader(file)
-            next(reader) #ヘッダーをスキップ 
+# 期限内
+register_loan("CUSTA", 5000, "2025-09-29", "2025-10-10", 10.0, "CASH", 3, 10.0, file_path="loan_v3_test.csv")
+# 延滞（猶予5日でも超えてる）
+register_loan("CUSTA", 7000, "2025-09-10", "2025-09-20", 10.0, "CASH", 5, 10.0, file_path="loan_v3_test.csv")
 
-            customers = list(reader) #ここで一旦すべて読み込んでリストにする
-
-            if not customers or all(not row for row in customers): #顧客がいないか全行空っぽなら
-                print("登録された顧客がいません。")
-            else:    
-                for row in reader:
-                    if row: #空行防止
-                        id, name, credit_limit = row
-                        print(f"ID: {id},名前:{name},貸付上限額:{int(credit_limit):,}円")
-
-    except FileNotFoundError:
-        print("顧客データが見つかりません。")
-
-list_customers()
+display_unpaid_loans("CUSTA", loan_file="loan_v3_test.csv", repayment_file="repayments.csv", filter_mode="all", today=date(2025,10,1))
+display_unpaid_loans("CUSTA", loan_file="loan_v3_test.csv", repayment_file="repayments.csv", filter_mode="overdue", today=date(2025,10,1))
