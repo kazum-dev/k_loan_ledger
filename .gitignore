@@ -1,9 +1,15 @@
-﻿# Logs
-data/app.log
-data/audit_log.csv
+# venv / キャッシュ
+.venv/
+__pycache__/
+.pytest_cache/
+
+# VS Code
+.vscode/
+
+# 実行生成物・ログ
 *.log
 
-# Caches/bytecode
-__pycache__/
-*.pyc
-modules/__pycache__/
+# ローカルCSV（台帳・ログ類）
+*.csv
+data/
+!data/.gitkeep
