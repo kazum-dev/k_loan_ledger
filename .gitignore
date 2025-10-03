@@ -13,3 +13,7 @@ __pycache__/
 *.csv
 data/
 !data/.gitkeep
+# override: keep data/ directory, ignore its contents except .gitkeep
+!data/
+data/*
+!data/.gitkeep
