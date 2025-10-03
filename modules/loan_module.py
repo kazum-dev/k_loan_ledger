@@ -1,12 +1,16 @@
 import csv
 import os
 import pandas as pd
+import json 
+import warnings
+import sys
 from datetime import date, datetime, timedelta
-from modules.utils import get_project_paths
+from modules.utils import get_project_paths, normalize_method # 既存の正規化（文字列）を再利用
 from decimal import Decimal, ROUND_HALF_UP, getcontext
 from enum import Enum
-from modules.utils import normalize_method  # 既存の正規化（文字列）を再利用
 getcontext().prec = 28 
+VERBOSE_AUDIT = True  # 本番で抑えたいときは False
+
 
 # 日付ごとにユニークな loan_id を生成する関数
 def generate_loan_id(file_path, loan_date=None):
@@ -95,7 +99,7 @@ def register_loan(
 ):
     # === 追加: パス自動解決 ===
     if not file_path:
-        paths = get_project_paths()
+        paths = _get_project_paths_patched()
         file_path = str(paths["loans_csv"])
     
     # 利率と延滞利率を受信したことを表示
@@ -231,8 +235,6 @@ def register_repayment():
 
     #顧客IDの入力と補正
     customer_id = input("顧客IDを入力してください（例：001 または CUST001）： ").strip()
-
-    # 入力された顧客IDを正規化（3桁なら CUST を付与）
     if customer_id.isdigit() and len(customer_id) == 3:
         customer_id = f"CUST{customer_id}"
     elif not customer_id.startswith("CUST"):
@@ -256,27 +258,25 @@ def register_repayment():
     if not repayment_date:
         repayment_date = str(datetime.today().date())
 
-    #CSVに返済データを追記(旧)
-    #try:
-        #with open("repayments.csv", mode="a", newline="", encoding="utf-8") as file:
-            #writer = csv.writer(file)
-            # 顧客ID・返済額・返済日を保存
-            #writer.writerow([loan_id, customer_id, amount, repayment_date])
+    try:
+        paths = _get_project_paths_patched()
+        loans_csv_path = str(paths["loans_csv"])
+    except Exception:
+        # パス解決に失敗したら規定ファイル名をフォールバック
+        loans_csv_path = "loan_v3.csv"
 
-        # 保存成功メッセージ
-        #print(f"✅ {customer_id} の返済記録を保存しました。")
+    repayments_csv_path = "repayments.csv"
 
-    #except Exception as e:
-        # CSV書き込みエラー時のメッセージ
-        #print(f"❌ CSV書き込み中にエラーが発生しました: {e}")
+    if not is_over_repayment(loans_csv_path, repayments_csv_path, loan_id, amount):
+        print("❌ 返済額が予定返済額を超えるため、この返済は記録しません。")
+        return
 
-    # CSVに返済データを追記（ヘッダー保証 + 列名を新仕様に統一）
     try:
         header = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
-        file_exists = os.path.exists("repayments.csv")
-        need_header = (not file_exists) or (os.stat("repayments.csv").st_size == 0)
+        file_exists = os.path.exists(repayments_csv_path)
+        need_header = (not file_exists) or (os.stat(repayments_csv_path).st_size == 0)
 
-        with open("repayments.csv", mode="a", newline="", encoding="utf-8") as file:
+        with open(repayments_csv_path, mode="a", newline="", encoding="utf-8") as file:
             writer = csv.DictWriter(file, fieldnames=header)
             if need_header:
                 writer.writeheader()
@@ -306,6 +306,73 @@ def register_repayment():
     except Exception as e:
         print(f"❌ CSV書き込み中にエラーが発生しました: {e}")
 
+def register_repayment_api(*, loan_id: str, customer_id: str, amount: int, repayment_date: str | None = None) -> bool:
+    if not repayment_date:
+        repayment_date = str(datetime.today().date())
+
+    # --- ローンCSVの場所を賢く推定 ---
+    def _contains_loan_id(csv_path: str, _loan_id: str) -> bool:
+        try:
+            with open(csv_path, newline="", encoding="utf-8") as f:
+                for row in csv.DictReader(f):
+                    if row.get("loan_id") == _loan_id:
+                        return True
+        except Exception:
+            pass
+        return False
+
+    loans_csv_path = None
+
+    # 1) adapter 側の get_project_paths（monkeypatch 済みならそれ）を試す
+    try:
+        paths = _get_project_paths_patched()
+        p = str(paths["loans_csv"])
+        if os.path.exists(p) and _contains_loan_id(p, loan_id):
+            loans_csv_path = p
+    except Exception:
+        pass
+
+    # 2) AUDIT_PATH と同じフォルダの loan_v3.csv を優先
+    if loans_csv_path is None:
+        audit_dir = os.path.dirname(_resolve_audit_path())
+        cand = os.path.join(audit_dir, "loan_v3.csv") if audit_dir else "loan_v3.csv"
+        if os.path.exists(cand) and _contains_loan_id(cand, loan_id):
+            loans_csv_path = cand
+
+    # 3) まだ決まらなければ従来の候補でフォールバック
+    if loans_csv_path is None:
+        try:
+            paths = _get_project_paths_patched()
+            loans_csv_path = str(paths["loans_csv"])
+        except Exception:
+            loans_csv_path = "loan_v3.csv"
+
+    repayments_csv_path = "repayments.csv"
+
+    if not is_over_repayment(loans_csv_path, repayments_csv_path, loan_id, amount):
+        return False
+
+    header = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
+    file_exists = os.path.exists(repayments_csv_path)
+    need_header = (not file_exists) or (os.stat(repayments_csv_path).st_size == 0)
+
+    with open(repayments_csv_path, "a", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=header)
+        if need_header:
+            w.writeheader()
+        w.writerow({
+            "loan_id": loan_id,
+            "customer_id": customer_id,
+            "repayment_amount": amount,
+            "repayment_date": repayment_date
+        })
+
+    append_audit(
+        event="REGISTER_REPAYMENT", loan_id=loan_id, amount=amount,
+        meta={"customer_id": customer_id, "paid_date": repayment_date}, actor="user"
+    )
+    return True
+
 # B-11.1 loan_idで貸付情報を検索
 def get_loan_info_by_loan_id(file_path, loan_id):
     with open(file_path, newline='', encoding='utf-8') as file:
@@ -318,12 +385,20 @@ def get_loan_info_by_loan_id(file_path, loan_id):
 # B-11.1 repayments.csvから返済合計を取得
 def get_total_repaid_amount(file_path, loan_id):
     total = 0
-    with open(file_path, newline='', encoding='utf-8-sig') as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            if row['loan_id'] == loan_id:
-                total += int(row['repayment_amount'])
+    try:
+        with open(file_path, newline='', encoding='utf-8-sig') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                if row.get('loan_id') == loan_id:
+                    try:
+                        total += int(row['repayment_amount'])
+                    except (ValueError, TypeError, KeyError):
+                        continue
+    except FileNotFoundError:
+        # 返済ファイルがまだ無ければ累計は 0
+        return 0
     return total
+
 
 # ▼ B-11.2 過剰返済チェックの共通関数
 def is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
@@ -335,15 +410,20 @@ def is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
 
     # 該当のloan_idの貸付情報を取得
     loan_info = get_loan_info_by_loan_id(loans_file, loan_id)
+    
     if loan_info is None:
-        print("❌ 指定された loan_id が loan_v3.csv に見つかりません")
+        print("❌ 指定された loan_id が見つからないため、この返済は記録しません。")
+        if VERBOSE_AUDIT:  # ← 追加フラグ
+            print(f"[DEV] loans_file={loans_file} loan_id={loan_id} が見つかりません。")
         return False
     
     # 予定返済額 repayment_expected を辞書から取得
     try:
         repayment_expected = int(loan_info["repayment_expected"])
     except (KeyError, ValueError):
-        print("❌ repayment_expected の読み込みに失敗しました。")
+        print("❌ 予定返済額の参照に失敗したため、この返済は記録しません。")
+        if VERBOSE_AUDIT:
+            print(f"[DEV] loan_id={loan_id} の repayment_expected を読めません。row={loan_info!r}")
         return False
 
     # loan_idに対する返済の合計額を取得
@@ -351,7 +431,11 @@ def is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
 
     # 合計返済額 + 入力額 > 予定返済額 か判定
     if total_repaid + repayment_amount > repayment_expected:
-        print(f"❌ 返済額が予定額を超えています。現在の累計返済額：{total_repaid}円 / 予定：{repayment_expected}円")
+        remaining = max(0, repayment_expected - total_repaid)
+        print("❌ 返済額が予定額を超えるため、この返済は記録しません。")
+        print(f"   残り登録可能額：¥{remaining:,}（予定：¥{repayment_expected:,}／累計：¥{total_repaid:,}）")
+        if VERBOSE_AUDIT:
+            print(f"[DEV] loan_id={loan_id} 入力：¥{repayment_amount:,} → 累計+入力=¥{(total_repaid+repayment_amount):,} > 予定")
         return False
 
     return True 
@@ -687,8 +771,6 @@ def display_unpaid_loans_old(customer_id, loan_file='loan.csv', repayment_file='
         print(f"❌ エラーが発生しました: {e}")
 
 # 延滞日数と延滞手数料を計算する関数
-import warnings
-
 def calculate_late_fee(
         principal, 
         due_date, 
@@ -697,11 +779,13 @@ def calculate_late_fee(
         **kwargs
     ):
 
+
     """
-    DEPECATED: 互換ラッパー。戻り値は (days_late, late_fee_int) を維持。
+    DEPRECATED: 互換ラッパー。戻り値は (days_late, late_fee_int) を維持。
     旧コードの呼び出しを壊さず、新ロジックへ譲渡します。
 
     追加で受け付ける任意引数（互換目的）：
+    - paid_date: 'YYYY-MM-DD' (あればこれを基準日にする)
     - grace_period_days: int = 0 (旧仕様は猶予なし。ここで0を規定にして互換を維持)
     - month_days: int = 30 (1ヶ月の日数とみなす)
     - late_base_amount: float = principal (延滞手数料の計算ベース)
@@ -711,11 +795,21 @@ def calculate_late_fee(
         DeprecationWarning, stacklevel=2
     )
 
-    # due_date は　date でも　'YYYY-MM-DD' でもOKにする
+    # due_date は　date か　'YYYY-MM-DD' を受ける
     if isinstance(due_date, str):
         due = _parse_date_yyyy_mm_dd(due_date)
     else:
         due = due_date
+
+    # 支払い基準日（任意）:あればそれを today とする
+    paid_date = kwargs.get("paid_date")
+    if paid_date:
+        try:
+            basis_day = _parse_date_yyyy_mm_dd(paid_date)
+        except Exception:
+            basis_day = date.today()
+    else:
+        basis_day = date.today()
 
     # 旧API互換の規定値（挙動を変えないため grace は 0 が規定）
     grace = int(kwargs.get("grace_period_days",0))
@@ -723,8 +817,7 @@ def calculate_late_fee(
     base_amount = float(kwargs.get("late_base_amount", principal))
 
     # 延滞日数（猶予は規定0。　将来、設定値に寄せたいときはここで default_grace を読む）
-    today_ = date.today()
-    overdue_days = calc_overdue_days(today_, due.isoformat(), grace)
+    overdue_days = calc_overdue_days(basis_day, due.isoformat(), grace)
 
     # 新ロジックで手数料を算出
     fee = calc_late_fee(
@@ -918,10 +1011,16 @@ def compute_recovery_amount(
     base = late_base_amount if late_base_amount is not None else repayment_expected
     odays = calc_overdue_days(today, due_date_str, grace_period_days) # 期日 + 猶予日数 を閾値にして延滞日数を返す（マイナスは0で切り上げ）
     lfee = calc_late_fee(base, late_fee_rate_percent, odays)
+
+    # 円に統一（四捨五入）
+    remaining_int = round_money(remain, unit=1)
+    late_fee_int = round_money(lfee, unit=1)
+    recovery_total_int = remaining_int + late_fee_int
+
     return{
-        "remaining": round(remain, 2),
-        "late_fee": round(lfee, 2),
-        "recovery_total": round(remain + lfee, 2),
+        "remaining": remaining_int,
+        "late_fee": late_fee_int,
+        "recovery_total": recovery_total_int,
         "overdue_days": odays,
     }
 
@@ -940,7 +1039,7 @@ def _normalize_repayments_headers(header_row: list[str]) -> list[str]:
 
 DATE_FMT = "%Y-%m-%d"
 
-def _parse_date(s: str) -> datetime.date:
+def _parse_date(s: str) -> date:
     return datetime.strptime(s, DATE_FMT).date()
 
 def _to_int(x, fallback=0) -> int:
@@ -949,7 +1048,7 @@ def _to_int(x, fallback=0) -> int:
     except (TypeError, ValueError):
         return fallback
     
-def compute_effective_due(due_date_str: str, grace_days) -> datetime.date:
+def compute_effective_due(due_date_str: str, grace_days: int) -> date:
     """due_date + grace_period_days を返す。grace_daysは欠損/不正なら0扱い。"""
     due = _parse_date(due_date_str)
     gd = _to_int(grace_days, 0)
@@ -959,25 +1058,32 @@ def compute_effective_due(due_date_str: str, grace_days) -> datetime.date:
 
 def is_overdue_with_grace(today: date, 
                           due_date_str: str,
-                          garce_period_days) -> bool:
-    return today > compute_effective_due(due_date_str, garce_period_days)
+                          grace_period_days: int) -> bool:
+    return today > compute_effective_due(due_date_str, grace_period_days)
 
 # C-4 監査ログ append_audit()
-import json
-
 AUDIT_PATH = "data/audit_log.csv"
 AUDIT_HEADERS = ["ts", "event", "loan_id", "amount", "meta", "actor"]
 
-def append_audit(event: str, 
+def append_audit(event: str,  
                  loan_id: str,
                  amount: float | int | None = None,
                  meta: dict | None = None,
                  actor: str = "system") -> None:
     """
     監査イベントをCSVに追記。
+    adapter (loan_module) 側で AUDIT_PATH が上書きされていればそちらを優先。
     """
-    os.makedirs(os.path.dirname(AUDIT_PATH), exist_ok=True)
-    file_exists = os.path.exists(AUDIT_PATH)
+    audit_path = _resolve_audit_path()  # ★ ここがポイント
+
+    # ディレクトリがある場合のみ作成（ファイル名のみの場合は skip）
+    dirn = os.path.dirname(audit_path)
+    if dirn:
+        os.makedirs(dirn, exist_ok=True)
+
+    file_exists = os.path.exists(audit_path)
+    need_header = (not file_exists) or (os.stat(audit_path).st_size == 0)
+
     row = {
         "ts": datetime.now().isoformat(timespec="seconds"),
         "event": event, 
@@ -986,9 +1092,41 @@ def append_audit(event: str,
         "meta": json.dumps(meta, ensure_ascii=False) if meta else "",
         "actor": actor,
     }
-    with open(AUDIT_PATH, "a", newline="", encoding="utf-8") as f:
+    with open(audit_path, "a", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=AUDIT_HEADERS)
-        if not file_exists:
+        if need_header:
             w.writeheader()
         w.writerow(row)
+
+
+def _get_project_paths_patched():
+    """
+    tests ではトップレベルの adapter モジュール `loan_module`
+    に対して monkeypatch されるので、そちらにオーバーライドが
+    あれば優先して使う。
+    """
+    try:
+        mod = sys.modules.get('loan_module')
+        if mod and hasattr(mod, 'get_project_paths'):
+            return mod.get_project_paths()
+    except Exception:
+        pass
+    return get_project_paths()
+
+
+def _resolve_audit_path() -> str:
+    """
+    adapter 側で AUDIT_PATH が上書きされていればそれを使う。
+    そうでなければ元の AUDIT_PATH を使う。
+    """
+    try:
+        mod = sys.modules.get('loan_module')
+        if mod:
+            p = getattr(mod, 'AUDIT_PATH', None)
+            if p:
+                return p
+    except Exception:
+        pass
+    return AUDIT_PATH
+
 
