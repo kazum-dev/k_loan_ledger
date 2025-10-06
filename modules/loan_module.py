@@ -130,12 +130,14 @@ def register_loan(
     if due_date is None or due_date == "": 
         due_date =  (datetime.strptime(loan_date, "%Y-%m-%d") + timedelta(days=30)).strftime("%Y-%m-%d") 
 
-    # 予定返済額 (Decimalベースで四捨五入。将来は round_unit=10/100 にも対応可)
-    repayment_expected = calc_repayment_expected(amount, interest_rate_percent, round_unit=1)
+    # 予定返済額（整数化を明示）
+    principal = int(float(amount))
+    repayment_expected = calc_repayment_expected(principal, interest_rate_percent, round_unit=1)
+
     print(f"[DEBUG] 自動計算された予定返済額: {repayment_expected}")
 
-    # 延滞対象元金を初期設定（amount をコピー）
-    late_base_amount = amount
+    # C-4.5 延滞対象元金は常に元金（整数化済の principal）に固定
+    late_base_amount = principal
     print(f"[DEBUG] late_base_amount の設定: {late_base_amount}")
 
     # ユニークな loan_id を生成
@@ -155,9 +157,9 @@ def register_loan(
         with open(file_path, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             # 保存する内容をデバック出力
-            print("[DEBUG] 保存内容：", [loan_id, customer_id, amount, loan_date, due_date, interest_rate_percent, repayment_expected, method_enum.value, grace_period_days, late_fee_rate_percent, late_base_amount])
+            print("[DEBUG] 保存内容：", [loan_id, customer_id, principal, loan_date, due_date, interest_rate_percent, repayment_expected, method_enum.value, grace_period_days, late_fee_rate_percent, late_base_amount])
             writer.writerow([
-                loan_id, customer_id, amount, loan_date, due_date, 
+                loan_id, customer_id, principal, loan_date, due_date, 
                 interest_rate_percent, repayment_expected, 
                 method_enum.value,
                 grace_period_days, late_fee_rate_percent, late_base_amount
@@ -171,7 +173,7 @@ def register_loan(
             append_audit(
                 event="REGISTER_LOAN",
                 loan_id=loan_id,
-                amount=amount,
+                amount=principal,
                 meta={
                     "customer_id": customer_id,
                     "loan_date": loan_date,
@@ -181,7 +183,8 @@ def register_loan(
                     "repayment_method": method_enum.value,
                     "grace_period_days": grace_period_days,
                     "late_fee_rate_percent": late_fee_rate_percent,
-                    "late_base_amount": late_base_amount, 
+                    "late_base_amount": late_base_amount,
+                    "policy": "C-4.5 fixed late_bee_base_amount == loan_amount",
                 },
                 actor="user"
             )
@@ -191,6 +194,7 @@ def register_loan(
 
     except Exception as e:
         print(f"❌ エラーが発生しました: {e}")
+    return loan_id
 
 # 顧客IDごとの貸付履歴を表示する関数
 def display_loan_history(customer_id, filepath):
