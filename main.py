@@ -25,7 +25,7 @@ from modules.utils import (
 )
 from modules.logger import get_logger
 from modules.audit import append_audit
-    
+
 # グローバル・ロガー （二重出力しないようモジュールレベルで生成）
 logger = get_logger("k_loan_ledger")
 
@@ -72,7 +72,7 @@ def loan_registration_mode(loans_file):
     if customer_id not in valid_ids:
         print("❌ 顧客IDが存在しません。先に顧客登録を行ってください。")
         return
-    
+
     # 貸付額を入力・チェック
     amount_input = input("💰貸付記録を入力してください（例：10000）: ")
 
@@ -81,23 +81,23 @@ def loan_registration_mode(loans_file):
         if amount <= 0:
             print("❌金額は1円以上で入力してください。")
             return
-        
+
         # 顧客の貸付上限金額を取得する
         # 入力金額が上限を超えていないか判定するために使う
         credit_limit = get_credit_limit(customer_id)
         if credit_limit is None:
             print("❌ 顧客の上限金額を取得できません。")
             return
-        
-        
+
+
         if amount > credit_limit:
             print(f"⚠ 上限額({credit_limit}円) を超えています。貸付記録を保存できません。")
             return
-        
+
     except ValueError:
         print("❌ 金額は整数で入力してください。")
         return
-    
+
     # 利率を入力
     interest_input = input("📈利率（％）を入力してください ※未入力時は10.0%: ").strip()
     try:
@@ -108,7 +108,7 @@ def loan_registration_mode(loans_file):
     except ValueError:
         print("❌ 利率は数値で入力してください。")
         return
-    
+
     # 貸付日を入力
     loan_date = input("📅貸付日を入力(例：2025-05-05)※未入力なら今日の日付になります: ").strip()
     loan_date = fmt_date(loan_date) or datetime.today().strftime("%Y-%m-%d")
@@ -140,14 +140,14 @@ def loan_registration_mode(loans_file):
     # late_fee_rate_percent を loan_module.py の register_loan に渡す
     # デフォルトは 10.0、キーワード引数で渡すことで順番ミスを防ぐ
     register_loan(
-        customer_id, amount, loan_date, 
-        interest_rate_percent=interest_rate, 
+        customer_id, amount, loan_date,
+        interest_rate_percent=interest_rate,
         repayment_method=repayment_method,
-        grace_period_days=grace_period_days, 
-        late_fee_rate_percent=late_fee_rate_percent, 
+        grace_period_days=grace_period_days,
+        late_fee_rate_percent=late_fee_rate_percent,
         file_path=loans_file
     )
-    
+
 def loan_history_mode(loans_file):
     print("=== 履歴表示モード ===")
     # 顧客IDを入力
@@ -179,7 +179,7 @@ def repayment_registration_mode(loans_file, repayments_file):
                     return row["customer_id"]
         print(f"[ERROR] loan_id {loan_id} が loan_v3.csv に存在しません。")
         # 存在しなければNone を返す。
-        return None 
+        return None
 
     # 貸付情報1件を repayments.csv へ追記
     def append_repayment_row(row_dict):
@@ -228,7 +228,7 @@ def repayment_registration_mode(loans_file, repayments_file):
         "customer_id": customer_id,
         "repayment_amount": repayment_amount,
         "repayment_date": repayment_date
-    } 
+    }
     append_repayment_row(row) # ここでCSVに書き込み
 
     print("✅ 返済記録の登録が完了しました。")
@@ -268,8 +268,8 @@ def main():
             print("5: 残高照会モード")
             print("9: 未返済サマリー表示（テスト用）")
             print("10: 延滞貸付表示モード")
-            print("9g: 未返済サマリー（全顧客）")     
-            print("10g: 延滞貸付（全顧客）")          
+            print("9g: 未返済サマリー（全顧客）")
+            print("10g: 延滞貸付（全顧客）")
             print("0: 終了")
 
             choice = input("モードを選択してください: ").strip()
@@ -310,7 +310,7 @@ def main():
                 customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
                 display_unpaid_loans(customer_id, filter_mode="overdue",
                                     loan_file=loans_file, repayment_file=repayments_file)
-                
+
             elif choice.lower() == "9g":
                 enter_mode("unpaid_summary_global")
                 print("\n=== 全顧客・未返済一覧＋サマリー ===")
@@ -328,7 +328,7 @@ def main():
                 append_audit("END", "app", "session", {"status": "OK"}, actor="CLI")
                 logger.info("App shutdown (user exit)")
                 break
-            
+
             else:
                 print("❌ 無効な選択肢です。もう一度入力してください。")
     except Exception as e:
@@ -375,15 +375,15 @@ if __name__ == "__main__":
         #loan_file="loan_v3.csv",
         #repayment_file="repayments.csv",
         #filter_mode="overdue",
-        #today=date(2025, 8, 27)    
+        #today=date(2025, 8, 27)
     #)
 
-# --- テスト用（B-13）---    
+# --- テスト用（B-13）---
     #loan_id = "L20250723-001"
     #result = is_loan_fully_repaid(loan_id)
     #print(f"[判定結果] Loan {loan_id} fully repaid? → {result}")
 
-    
+
 
 # --- テスト用（B-12）---
 #    test_loan_id = "L20250721-001"
