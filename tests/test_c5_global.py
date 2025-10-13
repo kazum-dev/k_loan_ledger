@@ -1,0 +1,45 @@
+from datetime import date
+from pathlib import Path
+import shutil
+
+from modules.loan_module import display_unpaid_loans_global
+from modules.utils import get_project_paths
+
+FIXED_TODAY = date(2025, 10, 13)
+
+def test_c5_global_all_lists_all_unpaid():
+    rows = display_unpaid_loans_global(filter_mode="all", today=FIXED_TODAY, echo=False)
+    assert len(rows) == 17
+    assert sum(r.get("remaining", 0) for r in rows) == 50794  # ¥50,794
+
+def test_c5_global_overdue_filters_only_overdue():
+    rows = display_unpaid_loans_global(filter_mode="overdue", today=FIXED_TODAY, echo=False)
+    assert rows and all(r.get("status") == "OVERDUE" for r in rows)
+    assert len(rows) == 3
+    assert sum(r.get("remaining", 0) for r in rows) == 13200    # ¥13,200
+    assert sum(r.get("late_fee", 0) for r in rows) == 87        # ¥87
+    assert sum(r.get("recovery_total", 0) for r in rows) == 13287  # ¥13,287
+
+def test_c5_global_resilience_bad_rows(tmp_path):
+    paths = get_project_paths()
+    src_loans = Path(paths["loans_csv"])
+    src_repayments = Path(paths["repayments_csv"])
+    dst_loans = tmp_path / "loan_v3.csv"
+    dst_repayments = tmp_path / "repayments.csv"
+    shutil.copyfile(src_loans, dst_loans)
+    shutil.copyfile(src_repayments, dst_repayments)
+
+    # 壊れた due_date 行を追記（落ちずにステータスで判別できること）
+    with dst_loans.open("a", encoding="utf-8", newline="") as f:
+        f.write("\nL99999999-ERR,CUST777,1000,2025-10-01,2025-13-40,10.0,1100,CASH,0,10.0,1000\n")
+
+    rows = display_unpaid_loans_global(
+        loan_file=str(dst_loans),
+        repayment_file=str(dst_repayments),
+        filter_mode="all",
+        today=FIXED_TODAY,
+        echo=False,
+    )
+    bad = [r for r in rows if r.get("loan_id") == "L99999999-ERR"]
+    assert bad, "壊れ行が返ってくるべき"
+    assert bad[0].get("status") in {"BAD_DUE_DATE", "DATE_ERR", "UNPAID"}
