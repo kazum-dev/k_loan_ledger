@@ -3,7 +3,7 @@
 from modules.customer_module import list_customers, search_customer, get_all_customer_ids, get_credit_limit
 
 # 貸付・返済関連の関数を import
-from modules.loan_module import register_loan, display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans, calculate_late_fee, calculate_total_repaid_by_loan_id, is_loan_fully_repaid
+from modules.loan_module import register_loan, display_loan_history, register_repayment, display_repayment_history, display_unpaid_loans, display_unpaid_loans_global, calculate_late_fee, calculate_total_repaid_by_loan_id, is_loan_fully_repaid
 
 # 残高照会関連の関数を import
 from modules.balance_module import display_balance
@@ -33,6 +33,25 @@ logger = get_logger("k_loan_ledger")
 def enter_mode(mode_name: str):
     logger.info(f"Enter mode: {mode_name}")
     append_audit("ENTER", "mode", mode_name, None)
+
+# --- どこか上の方に追加 ---
+def _print_global_rows(rows: list[dict]) -> None:
+    if not rows:
+        print("(対象なし)")
+        return
+    print("  [STATUS] loan_id      ｜customer ｜due_date   ｜grace｜odays｜remaining｜late_fee｜recovery")
+    for r in rows:
+        sep = "｜"
+        print(f"[{r.get('status',''): <7}] "
+              f"{r.get('loan_id',''): <14}{sep}"
+              f"{r.get('customer_id',''): <9}{sep}"
+              f"{(r.get('due_date') or ''): <10}{sep}"
+              f"{r.get('grace_period_days',0): >5}{sep}"
+              f"{r.get('overdue_days',0): >5}{sep}"
+              f"¥{r.get('remaining',0): >8,}{sep}"
+              f"¥{r.get('late_fee',0): >7,}{sep}"
+              f"¥{r.get('recovery_total',0): >8,}")
+
 
 def loan_registration_mode(loans_file):
 
@@ -249,6 +268,8 @@ def main():
             print("5: 残高照会モード")
             print("9: 未返済サマリー表示（テスト用）")
             print("10: 延滞貸付表示モード")
+            print("9g: 未返済サマリー（全顧客）")     
+            print("10g: 延滞貸付（全顧客）")          
             print("0: 終了")
 
             choice = input("モードを選択してください: ").strip()
@@ -289,6 +310,18 @@ def main():
                 customer_id = normalize_customer_id(input("👤 顧客IDを入力してください（例：CUST001 または 001）: ").strip())
                 display_unpaid_loans(customer_id, filter_mode="overdue",
                                     loan_file=loans_file, repayment_file=repayments_file)
+                
+            elif choice.lower() == "9g":
+                enter_mode("unpaid_summary_global")
+                print("\n=== 全顧客・未返済一覧＋サマリー ===")
+                rows_all = display_unpaid_loans_global(filter_mode="all")
+                _print_global_rows(rows_all)
+
+            elif choice.lower() == "10g":
+                enter_mode("overdue_loans_global")
+                print("\n=== 全顧客・延滞一覧＋サマリー ===")
+                rows_od = display_unpaid_loans_global(filter_mode="overdue")
+                _print_global_rows(rows_od)
 
             elif choice == "0":
                 print("終了します。")
