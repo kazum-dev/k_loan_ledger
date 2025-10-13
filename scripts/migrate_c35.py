@@ -25,39 +25,70 @@ from pathlib import Path
 from datetime import datetime, timezone
 import csv as _csv  # 既存の csv と衝突しないよう別名でもOK
 
-def append_local_migration_audit(run_id: str, loan_id: str, field: str, before, after, reason: str, options: str, operator: str):
+
+def append_local_migration_audit(
+    run_id: str,
+    loan_id: str,
+    field: str,
+    before,
+    after,
+    reason: str,
+    options: str,
+    operator: str,
+):
     """
     Always write C-3.5 audit to data/migration_audit.csv (project-local)
     regardless of project-specific audit module behavior.
     """
     out = Path("data") / "migration_audit.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
-    header = ["run_id","timestamp","loan_id","field","before","after","reason","options","operator"]
+    header = [
+        "run_id",
+        "timestamp",
+        "loan_id",
+        "field",
+        "before",
+        "after",
+        "reason",
+        "options",
+        "operator",
+    ]
     ts = datetime.now(timezone.utc).astimezone().isoformat()
     write_header = not out.exists()
     with out.open("a", encoding="utf-8", newline="") as f:
         w = _csv.writer(f)
         if write_header:
             w.writerow(header)
-        w.writerow([run_id, ts, loan_id, field, before, after, reason, options, operator])
+        w.writerow(
+            [run_id, ts, loan_id, field, before, after, reason, options, operator]
+        )
+
 
 # Optional imports for project logger/audit; fallback to stdout if not found
 try:
     from modules.logger import get_logger  # type: ignore
 except Exception:
     import logging
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
+    )
+
     def get_logger():
         return logging.getLogger("migrate_c35")
+
 
 try:
     from modules.audit import append_audit  # type: ignore
 except Exception:
+
     def append_audit(*args, **kwargs):
         # Fallback: no-op
         pass
 
+
 logger = get_logger()
+
 
 @dataclass
 class Counters:
@@ -66,6 +97,7 @@ class Counters:
     expected_changed: int = 0
     warnings: int = 0
     errors: int = 0
+
 
 def load_mapping(mapping_path: Path):
     if not mapping_path.exists():
@@ -87,6 +119,7 @@ def load_mapping(mapping_path: Path):
     with mapping_path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
+
 def normalize_method(value: str, mapping: dict) -> str:
     if value is None:
         return "UNKNOWN"
@@ -94,13 +127,19 @@ def normalize_method(value: str, mapping: dict) -> str:
     if v in mapping:
         return mapping[v]
     # Heuristic: ASCII words to UPPER; otherwise UNKNOWN
-    return v.upper() if v.isascii() and v.upper() in {"CASH", "BANK_TRANSFER", "UNKNOWN"} else "UNKNOWN"
+    return (
+        v.upper()
+        if v.isascii() and v.upper() in {"CASH", "BANK_TRANSFER", "UNKNOWN"}
+        else "UNKNOWN"
+    )
+
 
 def recalc_expected(principal: str, rate_percent: str) -> int:
     p = Decimal(str(principal))
-    r = (Decimal(str(rate_percent)) / Decimal("100"))
+    r = Decimal(str(rate_percent)) / Decimal("100")
     expected = p * (Decimal("1") + r)
     return int(expected.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
 
 def backup_csv(csv_path: Path, backup_dir: Path) -> Path:
     ts = datetime.now(timezone.utc).astimezone().strftime("%Y%m%d%H%M%S")
@@ -108,16 +147,55 @@ def backup_csv(csv_path: Path, backup_dir: Path) -> Path:
     backup_path.write_bytes(csv_path.read_bytes())
     return backup_path
 
-def append_audit_row(run_id: str, loan_id: str, field: str, before, after, reason: str, options: str, operator: str):
+
+def append_audit_row(
+    run_id: str,
+    loan_id: str,
+    field: str,
+    before,
+    after,
+    reason: str,
+    options: str,
+    operator: str,
+):
     try:
-        append_audit(run_id=run_id, loan_id=loan_id, field=field, before=before, after=after, reason=reason, options=options, operator=operator)
+        append_audit(
+            run_id=run_id,
+            loan_id=loan_id,
+            field=field,
+            before=before,
+            after=after,
+            reason=reason,
+            options=options,
+            operator=operator,
+        )
     except TypeError:
         # Fallback: write to CSV in data/audit_log.csv
         out = Path("data") / "audit_log.csv"
         out.parent.mkdir(parents=True, exist_ok=True)
-        header = ["run_id","timestamp","loan_id","field","before","after","reason","options","operator"]
+        header = [
+            "run_id",
+            "timestamp",
+            "loan_id",
+            "field",
+            "before",
+            "after",
+            "reason",
+            "options",
+            "operator",
+        ]
         ts = datetime.now(timezone.utc).astimezone().isoformat()
-        new_line = [run_id, ts, loan_id, field, str(before), str(after), reason, options, operator]
+        new_line = [
+            run_id,
+            ts,
+            loan_id,
+            field,
+            str(before),
+            str(after),
+            reason,
+            options,
+            operator,
+        ]
         write_header = not out.exists()
         with out.open("a", encoding="utf-8", newline="") as f:
             w = csv.writer(f)
@@ -125,7 +203,16 @@ def append_audit_row(run_id: str, loan_id: str, field: str, before, after, reaso
                 w.writerow(header)
             w.writerow(new_line)
 
-def migrate(csv_path: Path, dry_run: bool, no_backup: bool, backup_dir: Path, fail_on_warn: bool, operator: str, mapping_path: Path) -> int:
+
+def migrate(
+    csv_path: Path,
+    dry_run: bool,
+    no_backup: bool,
+    backup_dir: Path,
+    fail_on_warn: bool,
+    operator: str,
+    mapping_path: Path,
+) -> int:
     counters = Counters()
     run_id = datetime.now(timezone.utc).astimezone().strftime("C35RUN-%Y%m%d-%H%M%S")
     options = f"dry_run={dry_run}, no_backup={no_backup}, backup_dir={backup_dir}"
@@ -142,7 +229,13 @@ def migrate(csv_path: Path, dry_run: bool, no_backup: bool, backup_dir: Path, fa
         rows = list(reader)
         fieldnames = reader.fieldnames or []
 
-    required = {"loan_id","loan_amount","interest_rate_percent","repayment_expected","repayment_method"}
+    required = {
+        "loan_id",
+        "loan_amount",
+        "interest_rate_percent",
+        "repayment_expected",
+        "repayment_method",
+    }
     missing = required - set(fieldnames)
     if missing:
         logger.error(f"Missing required columns: {missing}")
@@ -157,29 +250,53 @@ def migrate(csv_path: Path, dry_run: bool, no_backup: bool, backup_dir: Path, fa
     # Process rows
     for row in rows:
         counters.total += 1
-        loan_id = row.get("loan_id","")
+        loan_id = row.get("loan_id", "")
 
         # Method normalize
         before_m = row["repayment_method"]
         after_m = normalize_method(before_m, mapping)
 
-        if after_m not in {"CASH","BANK_TRANSFER","UNKNOWN"}:
+        if after_m not in {"CASH", "BANK_TRANSFER", "UNKNOWN"}:
             # Shouldn't happen, but guard
             counters.warnings += 1
             after_m = "UNKNOWN"
 
         if after_m != before_m:
             counters.method_changed += 1
-            append_audit_row(run_id, loan_id, "repayment_method", before_m, after_m, 
-                             "method_normalized", options, operator)
-            append_audit_row(run_id, loan_id, "repayment_method", before_m, after_m, 
-                             "method_normalized", options, operator)
-            append_local_migration_audit(run_id, loan_id, "repayment_method", before_m, after_m, 
-                                         "method_normalized", options, operator)
+            append_audit_row(
+                run_id,
+                loan_id,
+                "repayment_method",
+                before_m,
+                after_m,
+                "method_normalized",
+                options,
+                operator,
+            )
+            append_audit_row(
+                run_id,
+                loan_id,
+                "repayment_method",
+                before_m,
+                after_m,
+                "method_normalized",
+                options,
+                operator,
+            )
+            append_local_migration_audit(
+                run_id,
+                loan_id,
+                "repayment_method",
+                before_m,
+                after_m,
+                "method_normalized",
+                options,
+                operator,
+            )
             row["repayment_method"] = after_m
 
         # Expected recalc
-        
+
         new_expected = recalc_expected(row["loan_amount"], row["interest_rate_percent"])
 
         before_e = row["repayment_expected"]
@@ -191,15 +308,33 @@ def migrate(csv_path: Path, dry_run: bool, no_backup: bool, backup_dir: Path, fa
 
         if new_expected != before_e_int:
             counters.expected_changed += 1
-            append_audit_row(run_id, loan_id, "repayment_expected", before_e, new_expected, 
-                             "expected_recalculated", options, operator)
-            append_local_migration_audit(run_id, loan_id, "repayment_expected", before_e, new_expected, 
-                                         "expected_recalculated", options, operator)
+            append_audit_row(
+                run_id,
+                loan_id,
+                "repayment_expected",
+                before_e,
+                new_expected,
+                "expected_recalculated",
+                options,
+                operator,
+            )
+            append_local_migration_audit(
+                run_id,
+                loan_id,
+                "repayment_expected",
+                before_e,
+                new_expected,
+                "expected_recalculated",
+                options,
+                operator,
+            )
             row["repayment_expected"] = str(new_expected)
-        
+
     # Write CSV
     def atomic_write_csv(csv_path, fieldnames, rows):
-        tmp = NamedTemporaryFile("w", encoding="utf-8", newline="", delete=False, dir=str(csv_path.parent))
+        tmp = NamedTemporaryFile(
+            "w", encoding="utf-8", newline="", delete=False, dir=str(csv_path.parent)
+        )
         tmp_path = Path(tmp.name)
         try:
             writer = csv.DictWriter(tmp, fieldnames=fieldnames)
@@ -209,18 +344,23 @@ def migrate(csv_path: Path, dry_run: bool, no_backup: bool, backup_dir: Path, fa
             os.replace(tmp_path, csv_path)  # 同一FSなら実質アトミック
         finally:
             if tmp_path.exists():
-                try: tmp_path.unlink()
-                except: pass
+                try:
+                    tmp_path.unlink()
+                except:
+                    pass
 
-# 既存の「if not dry_run: ... writer = csv.DictWriter(...」の塊をこれに置き換え
+    # 既存の「if not dry_run: ... writer = csv.DictWriter(...」の塊をこれに置き換え
     if not dry_run:
         atomic_write_csv(csv_path, fieldnames, rows)
 
     # Summary
-    logger.info(f"[C-3.5] total={counters.total} method_changed={counters.method_changed} expected_changed={counters.expected_changed} warnings={counters.warnings} errors={counters.errors} backup={backup_path}")
+    logger.info(
+        f"[C-3.5] total={counters.total} method_changed={counters.method_changed} expected_changed={counters.expected_changed} warnings={counters.warnings} errors={counters.errors} backup={backup_path}"
+    )
     if fail_on_warn and (counters.warnings > 0 or counters.errors > 0):
         return 3
     return 0
+
 
 def main():
     p = argparse.ArgumentParser(description="C-3.5 Migration")
@@ -237,8 +377,17 @@ def main():
     backup_dir = Path(args.backup_dir)
     mapping_path = Path(args.mapping)
 
-    code = migrate(csv_path, args.dry_run, args.no_backup, backup_dir, args.fail_on_warn, args.operator, mapping_path)
+    code = migrate(
+        csv_path,
+        args.dry_run,
+        args.no_backup,
+        backup_dir,
+        args.fail_on_warn,
+        args.operator,
+        mapping_path,
+    )
     sys.exit(code)
+
 
 if __name__ == "__main__":
     main()

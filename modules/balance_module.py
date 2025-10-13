@@ -12,13 +12,16 @@ REPAYMENTS_FILE_DEFAULT = os.path.join(PROJECT_DIR, "repayments.csv")
 
 def _normalize_dict(d: dict) -> dict:
     """キーと値の前後空白やクォート（' / "）を除去して正規化。"""
+
     def _norm(s: str) -> str:
         return (s or "").strip().strip("'\"")
+
     return {_norm(k): _norm(v) for k, v in (d or {}).items()}
 
 
-def load_balances(loans_file: str = LOANS_FILE_DEFAULT,
-                  repayments_file: str = REPAYMENTS_FILE_DEFAULT):
+def load_balances(
+    loans_file: str = LOANS_FILE_DEFAULT, repayments_file: str = REPAYMENTS_FILE_DEFAULT
+):
     """
     顧客別：
       - 貸付側：repayment_expected の合計（無ければ loan_amount を保険）
@@ -65,10 +68,12 @@ def load_balances(loans_file: str = LOANS_FILE_DEFAULT,
     return loan_totals, repayment_totals
 
 
-def display_balance(customer_id: str,
-                    loans_file: str = LOANS_FILE_DEFAULT,
-                    repayments_file: str = REPAYMENTS_FILE_DEFAULT,
-                    clamp_negative: bool = False):
+def display_balance(
+    customer_id: str,
+    loans_file: str = LOANS_FILE_DEFAULT,
+    repayments_file: str = REPAYMENTS_FILE_DEFAULT,
+    clamp_negative: bool = False,
+):
     """
     残高を表示する。clamp_negative=True でマイナス表示を0に丸め可能。
     """

@@ -18,14 +18,17 @@ def test_compute_effective_due_clamps_negative_grace():
 
 
 # ---------- A2: A/B/Cケースで is_overdue_with_grace の真偽 ----------
-@pytest.mark.parametrize("today_s, due_s, grace, expected", [
-    # A: 期日+猶予 ちょうどの日は延滞ではない（ > 判定なのでFalse）
-    ("2025-10-15", "2025-10-12", 3, False),
-    # B: 期日+猶予 を1日超えたら延滞
-    ("2025-10-16", "2025-10-12", 3, True),
-    # C: 猶予が負でも0として扱う → 2025-10-13 は延滞
-    ("2025-10-13", "2025-10-12", -2, True),
-])
+@pytest.mark.parametrize(
+    "today_s, due_s, grace, expected",
+    [
+        # A: 期日+猶予 ちょうどの日は延滞ではない（ > 判定なのでFalse）
+        ("2025-10-15", "2025-10-12", 3, False),
+        # B: 期日+猶予 を1日超えたら延滞
+        ("2025-10-16", "2025-10-12", 3, True),
+        # C: 猶予が負でも0として扱う → 2025-10-13 は延滞
+        ("2025-10-13", "2025-10-12", -2, True),
+    ],
+)
 def test_is_overdue_with_grace_cases(today_s, due_s, grace, expected):
     today = date.fromisoformat(today_s)
     assert m.is_overdue_with_grace(today, due_s, grace) is expected
@@ -53,9 +56,11 @@ def test_audit_log_headers_and_success_only(tmp_path, monkeypatch):
     with audit_path.open(encoding="utf-8") as f:
         r = list(csv.DictReader(f))
     assert [*r[0].keys()] == m.AUDIT_HEADERS  # ヘッダ一致（B1）
-    assert r[-1]["event"] == "REGISTER_LOAN"   # 成功時のみ追記（B2）
+    assert r[-1]["event"] == "REGISTER_LOAN"  # 成功時のみ追記（B2）
     meta = json.loads(r[-1]["meta"])
-    assert meta["loan_date"] == "2025-10-01" and meta["due_date"] == "2025-10-31"  # metaチェック（B3）
+    assert (
+        meta["loan_date"] == "2025-10-01" and meta["due_date"] == "2025-10-31"
+    )  # metaチェック（B3）
 
     # 2) loan_id取得（ファイルから読む）
     with loans_csv.open(encoding="utf-8") as f:
@@ -83,7 +88,9 @@ def test_register_repayment_overpay_blocks_and_no_audit(tmp_path, monkeypatch):
 
     # 貸付CSV
     loans_csv = tmp_path / "loan_v3.csv"
-    m.register_loan("CUST001", 1000, "2025-10-01", "2025-10-31", file_path=str(loans_csv))
+    m.register_loan(
+        "CUST001", 1000, "2025-10-01", "2025-10-31", file_path=str(loans_csv)
+    )
 
     # 直近のloan_id
     with loans_csv.open(encoding="utf-8") as f:
@@ -120,7 +127,9 @@ def test_register_repayment_interactive_flow(tmp_path, monkeypatch, capsys):
     # 監査ログ差し替え & 貸付CSVセットアップ
     monkeypatch.setattr(m, "AUDIT_PATH", str(tmp_path / "audit.csv"))
     loans_csv = tmp_path / "loan_v3.csv"
-    m.register_loan("CUST001", 1000, "2025-10-01", "2025-10-31", file_path=str(loans_csv))
+    m.register_loan(
+        "CUST001", 1000, "2025-10-01", "2025-10-31", file_path=str(loans_csv)
+    )
 
     # loan_id
     with loans_csv.open(encoding="utf-8") as f:

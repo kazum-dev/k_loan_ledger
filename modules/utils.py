@@ -4,7 +4,7 @@ from __future__ import annotations
 import csv
 import math
 import re
-from datetime import date,datetime
+from datetime import date, datetime
 from pathlib import Path
 from typing import Dict, Optional, Set, Tuple, Union
 
@@ -13,6 +13,7 @@ from typing import Dict, Optional, Set, Tuple, Union
 # ======================
 
 _CUST_PATTERN = re.compile(r"^(?:CUST)?0*([0-9]{1,})$", re.IGNORECASE)
+
 
 def normalize_customer_id(s: Union[str, int, None]) -> str:
     """
@@ -27,10 +28,11 @@ def normalize_customer_id(s: Union[str, int, None]) -> str:
         digits = re.sub(r"\D", "", text)
         if digits == "":
             return "CUST000"
-        n= int(digits)
+        n = int(digits)
     else:
-        n= int(m.group(1))
+        n = int(m.group(1))
     return f"CUST{n:03d}"
+
 
 _METHOD_MAP = {
     # 英語
@@ -49,6 +51,7 @@ _METHOD_MAP = {
     "不明": "UNKNOWN",
 }
 
+
 def normalize_method(s: Optional[str]) -> str:
     """
     支払い方法を標準化: CASH / BANK_TRANSFER / OTHER / UNKNOWN
@@ -61,9 +64,11 @@ def normalize_method(s: Optional[str]) -> str:
     key2 = key.lower().replace(" ", "_").replace("-", "_")
     return _METHOD_MAP.get(key2, "UNKNOWN")
 
+
 # ======================
 # 金額・日付の整形
 # ======================
+
 
 def round_money(x: Union[int, float, str, None]) -> int:
     """
@@ -75,12 +80,14 @@ def round_money(x: Union[int, float, str, None]) -> int:
         return 0
     return int(math.floor(val))
 
+
 def fmt_currency(n: Union[int, float, str, None]) -> str:
     """
     "¥12,345" 形式。内部でround_money を通す。
     """
     yen = round_money(n)
     return f"¥{yen:,}"
+
 
 def fmt_date(d: Union[str, date, datetime, None]) -> Optional[str]:
     """
@@ -98,15 +105,17 @@ def fmt_date(d: Union[str, date, datetime, None]) -> Optional[str]:
         return None
     if re.match(r"^\d{4}-\d{2}-\d{2}$", s):
         return s
-    s2 = re.sub(r"[./]", "-", s) 
+    s2 = re.sub(r"[./]", "-", s)
     try:
         return datetime.strptime(s2, "%Y-%m-%d").date().isoformat()
     except ValueError:
         return None
-    
+
+
 # =======================
 # CSV ヘッダ補正 ＆ スキーマ検証
 # =======================
+
 
 def clean_header_if_quoted(path: Union[str, Path]) -> bool:
     """
@@ -145,6 +154,7 @@ def clean_header_if_quoted(path: Union[str, Path]) -> bool:
 
     return True
 
+
 def validate_schema(path: Union[str, Path], required_cols: Set[str]) -> bool:
     """
     CSV の1行目(ヘッダ)が required_cols を包含しているか確認。
@@ -155,7 +165,7 @@ def validate_schema(path: Union[str, Path], required_cols: Set[str]) -> bool:
     if not p.exists():
         print(f"[validate_schema] file not found: {p}")
         return False
-    
+
     # BOM を除去するため utf-8-sig で読む
     with p.open("r", newline="", encoding="utf-8-sig") as f:
         first_line = ""
@@ -164,17 +174,17 @@ def validate_schema(path: Union[str, Path], required_cols: Set[str]) -> bool:
             if not first_line:
                 print(f"[validate_schema] empty file: {p}")
                 return False
-        
+
     # カンマ分割 → 余分な空白/引用符/BOMの残りを除去
     raw_cols = [c.strip() for c in first_line.rstrip("\n\r").split(",")]
 
     def _normalize_col(name: str) -> str:
         # 先頭末尾の二重引用符を外す
         if len(name) >= 2 and name[0] == '"' and name[-1] == '"':
-            name = name[1:-1] 
+            name = name[1:-1]
         # 万一残っているBOMを除去
-        return name.lstrip("\ufeff").strip() 
-    
+        return name.lstrip("\ufeff").strip()
+
     header_set = {_normalize_col(h) for h in raw_cols}
     missing = sorted(list(required_cols - header_set))
     if missing:
@@ -182,9 +192,11 @@ def validate_schema(path: Union[str, Path], required_cols: Set[str]) -> bool:
         return False
     return True
 
+
 # =======================
 # パス取得（loan_v3.csv 優先検出）
 # =======================
+
 
 def get_project_paths(root_hint: Optional[Union[str, Path]] = None) -> Dict[str, Path]:
     """
@@ -192,6 +204,7 @@ def get_project_paths(root_hint: Optional[Union[str, Path]] = None) -> Dict[str,
     既存の loan_v3.csv があればそれを最優先で採用。
     無ければ loans.csv をデフォルト名として返す。
     """
+
     def _discover_root() -> Path:
         if root_hint:
             return Path(root_hint).resolve()
@@ -203,28 +216,30 @@ def get_project_paths(root_hint: Optional[Union[str, Path]] = None) -> Dict[str,
 
     root = _discover_root()
     modules_dir = root / "modules"
-    data_dir = root /"data"
+    data_dir = root / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
 
     candidate_loans = [
-        data_dir / "loan_v3.csv",   # 既存命名
-        data_dir / "loans.csv",     # 新規標準
-    ] 
-    loans_csv = next((p for p in candidate_loans if p.exists()), candidate_loans[0]) 
+        data_dir / "loan_v3.csv",  # 既存命名
+        data_dir / "loans.csv",  # 新規標準
+    ]
+    loans_csv = next((p for p in candidate_loans if p.exists()), candidate_loans[0])
 
     repayments_csv = data_dir / "repayments.csv"
 
     return {
-        "root": root, 
+        "root": root,
         "modules": modules_dir,
         "data": data_dir,
         "loans_csv": loans_csv,
         "repayments_csv": repayments_csv,
-    }   
+    }
+
 
 # ======================
 #  簡易セルフテスト
-#　=====================
+# 　=====================
+
 
 def _selfcheck() -> None:
     assert normalize_customer_id("1") == "CUST001"
@@ -236,6 +251,7 @@ def _selfcheck() -> None:
     assert round_money(-1.2) == -2
     assert fmt_currency(1234567.89) == "¥1,234,567"
     assert fmt_date("2025/09/01") == "2025-09-01"
+
 
 if __name__ == "__main__":
     _selfcheck()

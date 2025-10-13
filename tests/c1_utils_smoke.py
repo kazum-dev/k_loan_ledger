@@ -3,8 +3,14 @@
 
 from pathlib import Path
 from modules.utils import (
-    normalize_customer_id, normalize_method, round_money, fmt_currency, fmt_date,
-    clean_header_if_quoted, validate_schema, get_project_paths
+    normalize_customer_id,
+    normalize_method,
+    round_money,
+    fmt_currency,
+    fmt_date,
+    clean_header_if_quoted,
+    validate_schema,
+    get_project_paths,
 )
 
 print("=== 0) パス確認 get_project_paths ===")
@@ -54,12 +60,21 @@ schema_bad = data_dir / "schema_bad_demo.csv"
 schema_bad.write_text("loan,amt\n001,1000\n", encoding="utf-8-sig")  # BOM付きで作成
 required = {"loan_id", "amount"}
 ok = validate_schema(schema_bad, required)
-print("validate_schema result:", ok, "(False になり、足りない列名が上で print されていればOK)")
+print(
+    "validate_schema result:",
+    ok,
+    "(False になり、足りない列名が上で print されていればOK)",
+)
 print()
 
 print("=== 8) get_project_paths 実在確認 ===")
 print("loans_csv ->", paths["loans_csv"], "exists?", paths["loans_csv"].exists())
-print("repayments_csv ->", paths["repayments_csv"], "exists?", paths["repayments_csv"].exists())
+print(
+    "repayments_csv ->",
+    paths["repayments_csv"],
+    "exists?",
+    paths["repayments_csv"].exists(),
+)
 print()
 
 print("--- 完了：上の入出力を見て、挙動イメージを掴もう ---")

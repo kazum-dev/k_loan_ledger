@@ -4,10 +4,12 @@ import csv, sys
 csv_path = sys.argv[1] if len(sys.argv) > 1 else "data/loan_v3.csv"
 ENUM = {"CASH", "BANK_TRANSFER", "UNKNOWN"}
 
+
 def recalc(loan_amount, rate_percent):
     p = Decimal(str(loan_amount))
     r = Decimal(str(rate_percent)) / Decimal("100")
     return int((p * (Decimal("1") + r)).quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+
 
 bad_enum = []
 bad_expected = []
