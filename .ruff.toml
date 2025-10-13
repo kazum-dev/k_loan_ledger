@@ -1,0 +1,12 @@
+target-version = "py313"
+line-length = 120
+
+[lint]
+select = ["E","F"]
+
+[lint.per-file-ignores]
+"tests/*" = ["E402","F401","F811","E701","E702","E722"]
+"loan_module.py" = ["F403"]
+"scripts/*" = ["E701","E702","E722","F811"]
+"modules/loan_module.backup.py" = ["E402","F811"]
+"modules/loan_module_backup_*.py" = ["E402","F811"]
