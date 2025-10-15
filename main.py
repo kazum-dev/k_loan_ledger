@@ -14,7 +14,6 @@ from modules.loan_module import (
     register_repayment,
     display_repayment_history,
     display_unpaid_loans,
-    calculate_late_fee,
     calculate_total_repaid_by_loan_id,
     is_loan_fully_repaid,
 )
@@ -23,7 +22,9 @@ from modules.loan_module import (
 from modules.balance_module import display_balance
 
 # 日付操作用
-from datetime import datetime
+from datetime import datetime, date
+# c-5
+import argparse
 
 # B-11
 import csv
@@ -31,7 +32,6 @@ import os
 
 # B-11.1
 from modules.loan_module import (
-    register_loan,
     get_total_repaid_amount,
     get_loan_info_by_loan_id,
     is_over_repayment,
@@ -49,9 +49,24 @@ from modules.utils import (
 from modules.logger import get_logger
 from modules.audit import append_audit
 
+
+
 # グローバル・ロガー （二重出力しないようモジュールレベルで生成）
 logger = get_logger("k_loan_ledger")
 
+def _parse_today_arg(s: str | None) -> date:
+    """--today の文字列を date に。未指定(None)なら今日を返す。"""
+    if not s:
+        return date.today()
+    try:
+        return datetime.strptime(s, "%Y-%m-%d").date()
+    except ValueError:
+        raise SystemExit(f"[ERROR] --today は YYYY-MM-DD 形式で指定してください: {s!r}")
+
+def _parse_cli_args():
+    p = argparse.ArgumentParser()
+    p.add_argument("--today", type=str, help="YYYY-MM-DD（指定がなければ今日）")
+    return p.parse_args()
 
 # 共通関数：モード突入時の技術ログ + 監査ログをセットで残す
 def enter_mode(mode_name: str):
@@ -267,9 +282,12 @@ def repayment_registration_mode(loans_file, repayments_file):
 
 
 def main():
+    args = _parse_cli_args()
+    today_override = _parse_today_arg(args.today)
     paths = get_project_paths()
     loans_file = str(paths["loans_csv"])
     repayments_file = str(paths["repayments_csv"])
+    
 
     # 起動ログ監査
     logger.info("App boot")
@@ -362,6 +380,7 @@ def main():
                     filter_mode="all",
                     loan_file=loans_file,
                     repayment_file=repayments_file,
+                    today=today_override,
                 )
 
             elif choice == "10":
@@ -377,6 +396,7 @@ def main():
                     filter_mode="overdue",
                     loan_file=loans_file,
                     repayment_file=repayments_file,
+                    today=today_override,
                 )
 
             elif choice == "0":

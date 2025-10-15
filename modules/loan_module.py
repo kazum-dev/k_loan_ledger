@@ -1,6 +1,6 @@
 import csv
 import os
-import pandas as pd
+# pandas 依存をなくす（C-５用途はCSV直読みで十分）
 import json
 import warnings
 import sys
@@ -588,20 +588,21 @@ def display_unpaid_loans(
             if not is_loan_fully_repaid(loan_id, loan_file, repayment_file):
                 unpaid.append(loan)
 
-        # 3) overdueフィルタ
-        def _is_overdue(row):
-            ds = row.get("due_date", "")
-            if not ds:
-                return False
-            try:
-                grace_days = int(row.get("grace_period_days", 0))
-            except ValueError:
-                grace_days = 0
-            # ✅ 猶予込みで延滞判定
-            return calc_overdue_days(_today, ds, grace_days) > 0
-
+        # 3) overdueフィルタ（インライン化してスコープ問題を回避）
         if filter_mode == "overdue":
-            unpaid = [ln for ln in unpaid if _is_overdue(ln)]
+            filtered = []
+            for ln in unpaid:
+                ds = ln.get("due_date", "")
+                if not ds:
+                    continue
+                try:
+                    grace_days = int(ln.get("grace_period_days", 0))
+                except ValueError:
+                    grace_days = 0
+                # ✅ 猶予込み延滞判定
+                if calc_overdue_days(_today, ds, grace_days) > 0:
+                    filtered.append(ln)
+            unpaid = filtered
         elif filter_mode != "all":
             print(f"[WARN] 未知のfilter_mode: {filter_mode} → 'all'扱い")
 
@@ -636,6 +637,7 @@ def display_unpaid_loans(
         rows_out = []
         for loan in unpaid:
             loan_id = loan["loan_id"]
+
             loan_date_jp = datetime.strptime(loan["loan_date"], "%Y-%m-%d").strftime(
                 "%Y年%m月%d日"
             )
@@ -643,10 +645,12 @@ def display_unpaid_loans(
             amount_str = f"{amount:,}円"
 
             due_str = loan.get("due_date", "")
+
             status = "UNPAID"
-            days_late = 0
+            overdue_days = 0
             late_fee = 0
-            recovery_amount = None
+            # 期日がない/不正でも破綻しないよう規定は 「残高=回収額」
+            recovery_amount = None  # 後で remaining + late_fee に必ず埋める
 
             # 予定返済額・累計返済・残
             try:
@@ -692,11 +696,12 @@ def display_unpaid_loans(
                         late_base_amount=late_base_amount,
                     )
 
-                    days_late = info["overdue_days"]
+                    
+                    overdue_days = info["overdue_days"]
                     late_fee = info["late_fee"]
                     remaining = info["remaining"]
                     recovery_amount = info["recovery_total"]
-                    status = "OVERDUE" if days_late > 0 else "UNPAID"
+                    status = "OVERDUE" if overdue_days > 0 else "UNPAID"
 
                 except ValueError:
                     status = "DATE_ERR"
@@ -705,46 +710,17 @@ def display_unpaid_loans(
             else:
                 due_jp = due_str
 
-            # if due_str:
-            # try:
-            # due = datetime.strptime(due_str, '%Y-%m-%d').date()
-            # due_jp = due.strftime('%Y年%m月%d日')
-            # if due < _today:
-            # status = 'OVERDUE'
-
-            # --- B-15：CSVの設定で延滞計算 ---
-            # try:
-            # late_base_amount = int(float(loan.get('late_base_amount', amount)))
-            # except ValueError:
-            # late_base_amount = amount
-            # try:
-            # late_rate_percent = float(loan.get('late_fee_rate_percent', 10.0))
-            # except ValueError:
-            # late_rate_percent = 10.0
-
-            # days_late, late_fee = calculate_late_fee(
-            # late_base_amount,
-            # due,
-            # late_fee_rate_percent=late_rate_percent
-            # )
-            # recovery_amount = expected + late_fee # 🧾 回収額
-            # except ValueError:
-            # status = 'DATE_ERR'
-            # due_jp = due_str # 壊れている場合は原文
-            # else:
-            # due_jp = due_str
-
             sep = "｜"
             # 延滞行のみ、追加情報を右側に連結
-            extra = ""
-            if status == "OVERDUE":
-                extra = (
-                    f"{sep}延滞日数：{days_late}日"
-                    f"{sep}延滞手数料：¥{late_fee:,}"
-                    f"{sep}🧾回収額：¥{recovery_amount:,}"
-                )
-            else:
-                extra = ""
+            
+            # 回収額は常に定義（未延滞・期日不正でも remaining + late_fee）
+            if recovery_amount is None:
+                recovery_amount = remaining + (late_fee or 0)
+            extra = (
+                f"{sep}延滞日数：{overdue_days}日{sep}延滞手数料：¥{late_fee:,}{sep}回収額：¥{recovery_amount:,}"
+                if status == "OVERDUE"
+                else ""
+            )
 
             line = (
                 f"[{status:<7}] "
@@ -758,7 +734,12 @@ def display_unpaid_loans(
                 f"{extra}"
             )
             print(line)
-
+            
+            # C-5 正字で返却
+            try:
+                grace_val = int(loan.get("grace_period_days",0))
+            except ValueError:
+                grace_val =0
             rows_out.append(
                 {
                     "loan_id": loan_id,
@@ -767,10 +748,11 @@ def display_unpaid_loans(
                     "due_date": due_str,
                     "status": status,
                     "repayment_expected": expected,
-                    "total_repaid": total_repaid,
                     "remaining": remaining,
-                    "days_late": days_late,
+                    "grace_period_days": grace_val,
+                    "overdue_days": overdue_days,
                     "late_fee": late_fee,
+                    "recovery_total": recovery_amount,
                 }
             )
 
@@ -1065,17 +1047,19 @@ def calculate_total_repaid_by_loan_id(repayments_file, loan_id):
         return 0
     return total
 
-
 def get_repayment_expected(loan_id: str, loan_file: str = "loan_v3.csv") -> float:
-    """
-    指定された loan_id に対して予定返済額を取得する。
-    """
-    df = pd.read_csv(loan_file)
-    row = df[df["loan_id"] == loan_id]
-    if row.empty:
-        raise ValueError(f"[ERROR] loan_id '{loan_id}' がloan_v3.csv に存在しません。")
-    return float(row.iloc[0]["repayment_expected"])
-
+    """指定 loan_id の予定返済額を CSV から取得（pandas不要）"""
+    try:
+        with open(loan_file, newline="", encoding="utf-8-sig") as f:
+            for row in csv.DictReader(f):
+                if row.get("loan_id") == loan_id:
+                    try:
+                        return float(row.get("repayment_expected", 0))
+                    except (TypeError, ValueError):
+                        return 0.0
+    except FileNotFoundError:
+        pass
+    raise ValueError(f"[ERROR] loan_id '{loan_id}' が {loan_file} に存在しません。")
 
 def is_loan_fully_repaid(
     loan_id: str,
