@@ -294,8 +294,11 @@ def main():
     append_audit("START", "app", "session", {"cwd": os.getcwd()}, actor="CLI")
 
     # ヘッダが "col" 形式なら自動で外す（初回だけでOK）
-    clean_header_if_quoted(loans_file)
-    clean_header_if_quoted(repayments_file)
+    # [C-6] 起動時のCSV健全化：引用符ヘッダがあれば除去してINFOログを残す
+    if clean_header_if_quoted(loans_file):
+        logger.info("clean_header_if_quoted: fixed header -> loan_v3.csv")
+    if clean_header_if_quoted(repayments_file):
+        logger.info("clean_header_if_quoted: fixed header -> repayments.csv")
 
     # 軽いスキーマ検証（足りない時は警告のみ）
     validate_schema(
