@@ -293,7 +293,7 @@ def main():
         from schema_migrator import check_or_migrate_schemas
         check_or_migrate_schemas()
     except Exception as e:
-        logger.warning(f"schema check faild (continue anyway): {e}")    
+        logger.warning(f"Schema check failed (continue anyway): {e}")    
 
     # 起動ログ監査
     logger.info("App boot")
