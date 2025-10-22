@@ -287,7 +287,13 @@ def main():
     paths = get_project_paths()
     loans_file = str(paths["loans_csv"])
     repayments_file = str(paths["repayments_csv"])
-    
+
+    # C-6.5: 起動スキーマ整合（無停止・冪等）
+    try:
+        from schema_migrator import check_or_migrate_schemas
+        check_or_migrate_schemas()
+    except Exception as e:
+        logger.warning(f"schema check faild (continue anyway): {e}")    
 
     # 起動ログ監査
     logger.info("App boot")
