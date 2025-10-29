@@ -1,19 +1,13 @@
+# data は生成物（中身はコミットしない）
+data/
+!data/.gitkeep
+
 # venv / キャッシュ
 .venv/
 __pycache__/
-.pytest_cache/
+*.pyc
 
-# VS Code
+# OS/IDE
+.DS_Store
+Thumbs.db
 .vscode/
-
-# 実行生成物・ログ
-*.log
-
-# ローカルCSV（台帳・ログ類）
-*.csv
-data/
-!data/.gitkeep
-# override: keep data/ directory, ignore its contents except .gitkeep
-!data/
-data/*
-!data/.gitkeep
