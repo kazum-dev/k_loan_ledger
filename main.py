@@ -1,43 +1,11 @@
-# --- import 群 ---
-# 顧客情報関連の関数を import
-from modules.customer_module import (
-    list_customers,
-    search_customer,
-    get_all_customer_ids,
-    get_credit_limit,
-)
-
-# 貸付・返済関連の関数を import
-from modules.loan_module import (
-    register_loan,
-    display_loan_history,
-    register_repayment,
-    display_repayment_history,
-    display_unpaid_loans,
-    calculate_total_repaid_by_loan_id,
-    is_loan_fully_repaid,
-)
-
-# 残高照会関連の関数を import
-from modules.balance_module import display_balance
-
-# 日付操作用
+# --- 軽量 import（--summary で必要なものだけ） ---
 from datetime import datetime, date
-# c-5
 import argparse
-
-# B-11
 import csv
 import os
+from pathlib import Path
 
-# B-11.1
-from modules.loan_module import (
-    get_total_repaid_amount,
-    get_loan_info_by_loan_id,
-    is_over_repayment,
-)
-
-# C-1
+# C-1（--summaryでも使う）
 from modules.utils import (
     normalize_customer_id,
     normalize_method,
@@ -46,13 +14,72 @@ from modules.utils import (
     clean_header_if_quoted,
     validate_schema,
 )
-from modules.logger import get_logger
-from modules.audit import append_audit
 
+# --- C-7.5 非対話サマリ（軽量） ---
 
+def _show_summary_noninteractive():
+    """data配下CSVの件数だけを非対話で表示（理解日用の軽量サマリ）"""
+    paths = get_project_paths()
+    loans_p = Path(paths["loans_csv"])
+    reps_p  = Path(paths["repayments_csv"])
 
-# グローバル・ロガー （二重出力しないようモジュールレベルで生成）
-logger = get_logger("k_loan_ledger")
+    def _read_rows(p: Path):
+        if p.exists() and p.stat().st_size > 0:
+            with p.open("r", newline="", encoding="utf-8-sig") as f:
+                return list(csv.DictReader(f))
+        return []
+
+    loans = _read_rows(loans_p)
+    reps  = _read_rows(reps_p)
+    print(f"[main] loans={len(loans)}, repayments={len(reps)}")
+
+# === ここから下の“重い import（ドメイン層）”は try でガード ===
+#    ※ --summary だけなら未存在でも問題なく動けるようにする
+try:
+    # 顧客情報関連
+    from modules.customer_module import (
+        list_customers,
+        search_customer,
+        get_all_customer_ids,
+        get_credit_limit,
+    )
+
+    # 貸付・返済関連
+    from modules.loan_module import (
+        register_loan,
+        display_loan_history,
+        register_repayment,
+        display_repayment_history,
+        display_unpaid_loans,
+        calculate_total_repaid_by_loan_id,
+        is_loan_fully_repaid,
+        get_total_repaid_amount,
+        get_loan_info_by_loan_id,
+        is_over_repayment,
+    )
+
+    # 残高照会
+    from modules.balance_module import display_balance
+
+    # ログ・監査
+    from modules.logger import get_logger
+    from modules.audit import append_audit   
+
+    # グローバル・ロガー （二重出力しないようモジュールレベルで生成）
+    logger = get_logger("k_loan_ledger")
+
+except ModuleNotFoundError:
+    # tests/test_seed_flow.py は最小構成のみをコピーするため、
+    # --summary 実行時はこれらが無い想定。ダミーを用意しておく。
+    def append_audit(*a, **k):
+        return None
+
+    class _DummyLogger:
+        def info(self, *a, **k): pass
+        def warning(self, *a, **k): pass
+        def error(self, *a, **k): pass
+
+    logger = _DummyLogger()
 
 def _parse_today_arg(s: str | None) -> date:
     """--today の文字列を date に。未指定(None)なら今日を返す。"""
@@ -63,9 +90,11 @@ def _parse_today_arg(s: str | None) -> date:
     except ValueError:
         raise SystemExit(f"[ERROR] --today は YYYY-MM-DD 形式で指定してください: {s!r}")
 
+# === 2) 既存の _parse_cli_args を置き換え === C-7.5
 def _parse_cli_args():
     p = argparse.ArgumentParser()
     p.add_argument("--today", type=str, help="YYYY-MM-DD（指定がなければ今日）")
+    p.add_argument("--summary", action="store_true", help="CSV件数のサマリのみ表示して終了（非対話）")
     return p.parse_args()
 
 # 共通関数：モード突入時の技術ログ + 監査ログをセットで残す
@@ -282,7 +311,26 @@ def repayment_registration_mode(loans_file, repayments_file):
 
 
 def main():
+    # C-7.5
     args = _parse_cli_args()
+    if getattr(args, "summary", False):
+        # ルート解決・CSV健全化は main() 本体の責務に乗る前に軽く実行
+        paths = get_project_paths()
+        # BOM/引用符の自動クレンジング（必要なら）
+        clean_header_if_quoted(paths["loans_csv"])
+        clean_header_if_quoted(paths["repayments_csv"])
+        # 最低限のスキーマ確認（WARNのみ）
+        validate_schema(paths["loans_csv"], {
+            "loan_id","customer_id","loan_amount","loan_date","due_date",
+            "interest_rate_percent","repayment_expected","repayment_method",
+            "grace_period_days","late_fee_rate_percent","late_base_amount",
+        })
+        validate_schema(paths["repayments_csv"], {
+            "loan_id","customer_id","repayment_amount","repayment_date",
+        })
+        _show_summary_noninteractive()
+        return
+    
     today_override = _parse_today_arg(args.today)
     paths = get_project_paths()
     loans_file = str(paths["loans_csv"])
