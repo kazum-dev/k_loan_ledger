@@ -266,15 +266,15 @@ pytest -q --maxfail=1 -k <keyword>
 
 - メニュー画面  
 
-&nbsp; !\[Menu](docs/images/menu.png)
+![Menu](docs/images/menu.png)
 
 - 未返済サマリー（メニュー \[9]）  
 
-&nbsp; !\[Unpaid Summary](docs/images/unpaid\_summary.png)
+![Unpaid Summary](docs/images/unpaid\_summary.png)
 
 - 延滞一覧（メニュー \[10]）  
 
-&nbsp; !\[Overdue List](docs/images/overdue\_list.png)
+![Overdue List](docs/images/overdue\_list.png)
 
 
 
