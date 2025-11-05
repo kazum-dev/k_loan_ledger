@@ -1,13 +1,15 @@
-# data は生成物（中身はコミットしない）
-data/
-!data/.gitkeep
-
 # venv / キャッシュ
 .venv/
 __pycache__/
-*.pyc
+.pytest_cache/
 
-# OS/IDE
-.DS_Store
-Thumbs.db
+# ログ
+logs/
+*.log
+
+# データ（バイナリ・生成物）
+data/
+*.csv
+
+# VSCode
 .vscode/
