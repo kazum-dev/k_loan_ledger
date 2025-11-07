@@ -259,7 +259,14 @@ def display_loan_history(customer_id, filepath):
                 due_date = row.get("due_date", "")
 
                 # 一軒ずつ履歴を出力
-                print(f"{date_str}｜{amount_str}｜返済期日：{due_date}")
+                tag = ""
+                try:
+                    if row.get("contract_status") == "CANCELLED":
+                        tag = " [CANCELLED]"
+                except Exception:
+                    pass
+                print(f"{date_str}｜{amount_str}｜返済期日：{due_date}{tag}")
+
 
         else:
             # 該当履歴がなかった場合のメッセージ
@@ -316,11 +323,11 @@ def register_repayment():
         loans_csv_path = "loan_v3.csv"
 
     repayments_csv_path = "repayments.csv"
-
+    
     if not is_over_repayment(loans_csv_path, repayments_csv_path, loan_id, amount):
-        print("❌ 返済額が予定返済額を超えるため、この返済は記録しません。")
+        # is_over_repayment() 側で詳細メッセージと残額案内を出すため、ここでは重複表示しない
         return
-
+    
     try:
         header = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
         file_exists = os.path.exists(repayments_csv_path)
@@ -578,6 +585,9 @@ def display_unpaid_loans(
             loans = [
                 row for row in loan_reader if row.get("customer_id") == customer_id
             ]
+        # CANCELLED は一覧から除外（回収対象ではないため）
+        loans = [row for row in loans if row.get("contract_status", "ACTIVE") != "CANCELLED"]
+
 
         # 2) 未返済のみ抽出（loan_idベース）
         unpaid = []
@@ -1255,3 +1265,106 @@ def _resolve_audit_path() -> str:
     except Exception:
         pass
     return AUDIT_PATH
+
+# === C-9: 契約解除（最小表現）===
+
+C9_COL_STATUS = "contract_status"
+C9_COL_CANCELLED_AT = "canceled_at"
+C9_COL_REASON = "cancel_reason"
+
+# === C-9: 契約解除（最小表現） ===============================================
+
+C9_COL_STATUS = "contract_status"
+C9_COL_CANCELLED_AT = "cancelled_at"
+C9_COL_REASON = "cancel_reason"
+
+def _ensure_c9_columns_or_raise(header: list[str]) -> None:
+    need = {C9_COL_STATUS, C9_COL_CANCELLED_AT, C9_COL_REASON}
+    if not need.issubset(set(header)):
+        missing = sorted(list(need - set(header)))
+        raise RuntimeError(f"[C-9] loan_v3.csv に必須列がありません。先にマイグレーションを実行してください: {missing}")
+
+def cancel_contract(loan_file: str, loan_id: str, *, reason: str = "", operator: str|None=None) -> bool:
+    """
+    指定 loan_id を CANCELLED に更新し、監査ログへ CANCEL_CONTRACT を記録する。
+    - 既に CANCELLED の場合は False。
+    - 完済済みは解除不可（安全策）。
+    """
+    # CSV 読み込み
+    with open(loan_file, "r", newline="", encoding="utf-8-sig") as f:
+        r = csv.reader(f)
+        rows = list(r)
+    if not rows:
+        print("[ERROR] 空の loan_v3.csv")
+        return False
+
+    header = [h.lstrip("\ufeff").strip().strip('"') for h in rows[0]]
+    _ensure_c9_columns_or_raise(header)
+    idx = {name: i for i, name in enumerate(header)}
+    body = rows[1:]
+
+    # 対象行探索
+    found = None
+    for i, row in enumerate(body):
+        if len(row) <= idx.get("loan_id", -1):
+            continue
+        if row[idx["loan_id"]] == loan_id:
+            found = (i, row)
+            break
+    if not found:
+        print(f"[ERROR] loan_id {loan_id} が見つかりません。")
+        return False
+
+    i, row = found
+
+    # 完済済みはブロック
+    try:
+        expected = int(float(row[idx["repayment_expected"]]))
+    except Exception:
+        expected = 0
+    total_repaid = calculate_total_repaid_by_loan_id(
+        os.path.join(os.path.dirname(loan_file) or "", "repayments.csv"),
+        loan_id
+    )
+    if total_repaid >= expected:
+        print("[ERROR] 完済済みのため契約解除はできません。")
+        return False
+
+    # 既にCANCELLED？
+    status = row[idx[C9_COL_STATUS]] if C9_COL_STATUS in idx else ""
+    if status == "CANCELLED":
+        print("[WARN] 既にCANCELLEDです。変更なし。")
+        return False
+
+    # 更新
+    row[idx[C9_COL_STATUS]] = "CANCELLED"
+    row[idx[C9_COL_CANCELLED_AT]] = datetime.now().astimezone().isoformat(timespec="seconds")
+    row[idx[C9_COL_REASON]] = reason or ""
+    body[i] = row
+
+    # 書き戻し
+    with open(loan_file, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(header)
+        w.writerows(body)
+
+    # 監査
+    try:
+        append_audit(
+            event="CANCEL_CONTRACT",
+            loan_id=loan_id,
+            amount="",
+            meta={
+                "previous_status": status or "ACTIVE",
+                "new_status": "CANCELLED",
+                "cancelled_at": row[idx[C9_COL_CANCELLED_AT]],
+                "cancel_reason": reason or "",
+                "operator": operator or "CLI",
+            },
+            actor=operator or "CLI",
+        )
+    except Exception as _e:
+        print(f"[WARN] append_audit で警告: {_e}")
+
+    print(f"✅ 契約解除を登録しました: loan_id={loan_id}")
+    return True

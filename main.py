@@ -31,7 +31,7 @@ def _show_summary_noninteractive():
 
     loans = _read_rows(loans_p)
     reps  = _read_rows(reps_p)
-    print(f"[main] loans={len(loans)}, repayments={len(reps)}")
+    print(f"[summary] loans: {len(loans)} | repayments: {len(reps)}")
 
 # === ここから下の“重い import（ドメイン層）”は try でガード ===
 #    ※ --summary だけなら未存在でも問題なく動けるようにする
@@ -180,6 +180,9 @@ def loan_registration_mode(loans_file):
     ).strip()
     try:
         grace_period_days = int(grace_input) if grace_input else 0
+        if grace_period_days < 0:
+            print("❌ 猶予日数は0以上で入力してください。")
+            return
     except ValueError:
         print("❌ 猶予日数は整数で入力してください。")
         return
@@ -223,10 +226,9 @@ def loan_history_mode(loans_file):
 
 # repayment_registration_mode の定義
 def repayment_registration_mode(loans_file, repayments_file):
-
     print("\n=== 返済記録モード (B-11 新実装）===")
 
-    # repayments.csv がなければ新規作成＆ヘッダー初期化（初回呼び出し時にのみ使用）
+    # 初期化（なければヘッダー作成）
     def initialize_repayments_csv():
         header = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
         with open(repayments_file, mode="w", newline="", encoding="utf-8") as f:
@@ -234,48 +236,39 @@ def repayment_registration_mode(loans_file, repayments_file):
             writer.writerow(header)
         print("[INFO] repayments.csv を初期化しました。")
 
-    # loan_id 存在確認 & customer_id 取得
-    def get_customer_id_by_loan_id(loan_id):
-        # loan_v3を読み取り、loan_id が存在するかどうかを検証
-        with open(loans_file, mode="r", encoding="utf-8") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if row["loan_id"] == loan_id:
-                    print(
-                        f"[DEBUG] loan_id {loan_id} 存在します。customer_id={row['customer_id']}"
-                    )
-                    # 一致すれば customer_id を返す。
-                    return row["customer_id"]
-        print(f"[ERROR] loan_id {loan_id} が loan_v3.csv に存在しません。")
-        # 存在しなければNone を返す。
-        return None
-
-    # 貸付情報1件を repayments.csv へ追記
-    def append_repayment_row(row_dict):
-        file_exists = os.path.isfile(repayments_file)
-        if not file_exists:
-            initialize_repayments_csv()
-
-        with open(repayments_file, mode="a", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(
-                f,
-                fieldnames=[
-                    "loan_id",
-                    "customer_id",
-                    "repayment_amount",
-                    "repayment_date",
-                ],
+    # 1) loan_id 直接入力 or 空Enterで未返済候補表示→選択
+    first = input("登録する loan_id を入力（未入力で顧客IDから未返済候補を表示）: ").strip()
+    if not first:
+        cust_input = input("顧客IDを入力してください（例：CUST001 または 001）: ").strip()
+        customer_id = normalize_customer_id(cust_input)
+        try:
+            # 未返済（期日内＋延滞）を一覧表示
+            _ = display_unpaid_loans(
+                customer_id,
+                filter_mode="all",
+                loan_file=loans_file,
+                repayment_file=repayments_file,
+                today=date.today(),
             )
-            writer.writerow(row_dict)
-        print(f"[INFO] repayments.csv に追記しました: {row_dict}")
+        except Exception as _e:
+            print(f"[WARN] 未返済候補の表示で警告: {_e}")
+        loan_id = input("上の一覧から登録する loan_id を入力してください: ").strip()
+    else:
+        loan_id = first
 
-    # 処理開始(ユーザー入力)
-    # loan_id入力
-    loan_id = input("登録する loan_id を入力してください: ").strip()
-    customer_id = get_customer_id_by_loan_id(loan_id)
-    if customer_id is None:
-        print("[ERROR] 処理を終了します。")
+    # loan_id 妥当性（存在）を loan_module 側APIで厳密確認
+    info = get_loan_info_by_loan_id(loans_file, loan_id)
+    if not info:
+        print(f"[ERROR] loan_id {loan_id} が {os.path.basename(loans_file)} に存在しません。")
+        print("       顧客IDから候補を出すには、もう一度やり直して最初の入力を空Enterしてください。")
         return
+    customer_id = info.get("customer_id")
+
+    # 契約解除済みはブロック
+    if info.get("contract_status") == "CANCELLED":
+        print(f"[ERROR] loan_id {loan_id} は契約解除済みのため返済登録できません。")
+        return
+
 
     # 返済金額入力
     while True:
@@ -285,10 +278,6 @@ def repayment_registration_mode(loans_file, repayments_file):
             break
         else:
             print("[ERROR] 数字かつ1円以上を入力してください。")
-
-    # 過剰返済かチェック
-    if not is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
-        return  # 処理中断
 
     # 返済日入力
     repayment_date = input(
@@ -305,10 +294,45 @@ def repayment_registration_mode(loans_file, repayments_file):
         "repayment_amount": repayment_amount,
         "repayment_date": repayment_date,
     }
-    append_repayment_row(row)  # ここでCSVに書き込み
+    # repayments.csv がなければ作成してから追記
+    file_exists = os.path.isfile(repayments_file)
+    if not file_exists or os.stat(repayments_file).st_size == 0:
+        initialize_repayments_csv()
+    with open(repayments_file, mode="a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["loan_id", "customer_id", "repayment_amount", "repayment_date"],
+        )
+        writer.writerow(row)
+    print(f"[INFO] repayments.csv に追記しました: {row}")
 
     print("✅ 返済記録の登録が完了しました。")
 
+def cancel_contract_mode(loans_file):
+    print("\n=== 契約解除登録(C-9) ===")
+    loan_id = input("契約解除する loan_id を入力してください: ").strip()
+    info = get_loan_info_by_loan_id(loans_file, loan_id)
+    if not info:
+        print(f"[ERROR] loan_id {loan_id} が見つかりません。")
+        return
+
+    # 事前プレビュー
+    print(f"  loan_id: {loan_id}")
+    print(f"  顧客ID : {info.get('customer_id')}")
+    print(f"  貸付日 : {info.get('loan_date')}")
+    print(f"  元本   : {info.get('loan_amount')}")
+    print(f"  期日   : {info.get('due_date')}")
+    print(f"  状態   : {info.get('contract_status','(なし→ACTIVE)')}")
+
+    reason = input("解除理由（空でも可）: ").strip()
+    ok = input("この内容で契約解除しますか？ (y/N): ").strip().lower()
+    if ok != "y":
+        print("[INFO] キャンセルしました。")
+        return
+
+    from modules.loan_module import cancel_contract
+    if cancel_contract(loans_file, loan_id, reason=reason, operator="CLI"):
+        pass  # 監査は cancel_contract 内で記録済み
 
 def main():
     # C-7.5
@@ -324,6 +348,8 @@ def main():
             "loan_id","customer_id","loan_amount","loan_date","due_date",
             "interest_rate_percent","repayment_expected","repayment_method",
             "grace_period_days","late_fee_rate_percent","late_base_amount",
+            # C-9
+            "contract_status","cancelled_at","cancel_reason",
         })
         validate_schema(paths["repayments_csv"], {
             "loan_id","customer_id","repayment_amount","repayment_date",
@@ -388,6 +414,7 @@ def main():
             print("5: 残高照会モード")
             print("9: 未返済サマリー表示（テスト用）")
             print("10: 延滞貸付表示モード")
+            print("11: 契約解除登録(C-9)")
             print("0: 終了")
 
             choice = input("モードを選択してください: ").strip()
@@ -455,6 +482,11 @@ def main():
                     repayment_file=repayments_file,
                     today=today_override,
                 )
+
+            elif choice == "11":
+                enter_mode("cancel_contract")
+                cancel_contract_mode(loans_file)
+
 
             elif choice == "0":
                 print("終了します。")

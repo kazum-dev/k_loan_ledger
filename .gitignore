@@ -13,3 +13,6 @@ data/
 
 # VSCode
 .vscode/
+data/audit_log.csv
+data/repayments.csv
+data/backup/
