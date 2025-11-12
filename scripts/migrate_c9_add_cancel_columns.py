@@ -3,7 +3,7 @@ from __future__ import annotations
 import argparse, csv, shutil
 from pathlib import Path
 
-NEW_COLS = ["contract_status", "canceled_at", "cancel_reason"]
+NEW_COLS = ["contract_status", "cancelled_at", "cancel_reason"]
 
 def migrate(path_in: str, path_out: str|None=None) -> None:
     p_in = Path(path_in)
@@ -16,7 +16,7 @@ def migrate(path_in: str, path_out: str|None=None) -> None:
         rows = list(csv.reader(f))
     if not rows:
         # 空ファイルはそのまま列ヘッダだけ作る
-        with p_out.open("w", newline="", encoding="itf-8") as f:
+        with p_out.open("w", newline="", encoding="utf-8") as f:
             w = csv.writer(f)
             w.writerow(NEW_COLS) # 最低限
         print("[INFO] empty file → header initialized with C-9 columns only")

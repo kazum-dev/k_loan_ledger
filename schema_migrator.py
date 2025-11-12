@@ -25,6 +25,10 @@ TARGET_SCHEMAS: Dict[str, List[str]] = {
         "grace_period_days",
         "late_fee_rate_percent",
         "late_base_amount",
+        # C-9 columns
+        "contract_status",
+        "cancelled_at",
+        "cancel_reason",
     ],
     "repayments": [
         "loan_id",
@@ -44,6 +48,7 @@ RENAME_MAPS: Dict[str, Dict[str, str]] = {
         "late_fee_percent": "late_fee_rate_percent",
         "late_amount_base": "late_base_amount",
         "amount": "loan_amount",
+        "canceled_at": "cancelled_at",
     },
     "repayments": {
         "amount": "repayment_amount",
@@ -58,6 +63,10 @@ DEFAULTS: Dict[str, Dict[str, str]] = {
         "grace_period_days": "0",
         "late_fee_rate_percent": "0",
         "late_base_amount": "",
+        # C-9 デフォルト
+        "contract_status": "ACTIVE",
+        "cancelled_at": "",
+        "cancel_reason": "",
     },
     "repayments": {},
 }

@@ -395,6 +395,8 @@ def main():
             "grace_period_days",
             "late_fee_rate_percent",
             "late_base_amount",
+            # C-9
+            "contract_status","cancelled_at","cancel_reason",
         },
     )
     validate_schema(

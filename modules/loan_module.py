@@ -1,16 +1,18 @@
 import csv
 import os
 # pandas 依存をなくす（C-５用途はCSV直読みで十分）
-import json
+
 import warnings
 import sys
 from datetime import date, datetime, timedelta
 from modules.utils import (
     get_project_paths,
-    normalize_method,
-)  # 既存の正規化（文字列）を再利用
+    normalize_method,)  
+# 既存の正規化（文字列）を再利用
 from decimal import Decimal, ROUND_HALF_UP, getcontext
 from enum import Enum
+from pathlib import Path
+from modules.audit import append_audit as _write_audit, AUDIT_FILE as _AUDIT_FILE
 
 getcontext().prec = 28
 VERBOSE_AUDIT = True  # 本番で抑えたいときは False
@@ -136,6 +138,10 @@ def register_loan(
         "grace_period_days",  # 延滞猶予日数
         "late_fee_rate_percent",  # 延滞利率（%）
         "late_base_amount",  # 延滞対象元金
+        # C-9 追加
+        "contract_status",
+        "cancelled_at",
+        "cancel_reason",
     ]
 
     # 返済期日が未入力なら 貸付日（loan_date） の30日後をデフォルト設定
@@ -200,6 +206,8 @@ def register_loan(
                     grace_period_days,
                     late_fee_rate_percent,
                     late_base_amount,
+                    # C-9 の初期値
+                    "ACTIVE", "", "",
                 ]
             )
 
@@ -208,10 +216,9 @@ def register_loan(
 
         # ★C-4 監査フック（成功時のみ）
         try:
-            append_audit(
-                event="REGISTER_LOAN",
+            _audit_event(
+                "REGISTER_LOAN",
                 loan_id=loan_id,
-                amount=amount,
                 meta={
                     "customer_id": customer_id,
                     "loan_date": loan_date,
@@ -222,13 +229,13 @@ def register_loan(
                     "grace_period_days": grace_period_days,
                     "late_fee_rate_percent": late_fee_rate_percent,
                     "late_base_amount": late_base_amount,
+                    "amount": amount,
                 },
-                actor="user",
+                actor="CLI",
             )
         except Exception as _e:
-            # エラーが起きた場合はメッセージを表示
-            print(f"[WARN] append_audit で警告: {_e}")
-
+            print(f"[WARN] audit で警告: {_e}")
+    
     except Exception as e:
         print(f"❌ エラーが発生しました: {e}")
 
@@ -349,19 +356,19 @@ def register_repayment():
 
         # ★C-4 監査フック（成功時のみ）
         try:
-            append_audit(
-                event="REGISTER_REPAYMENT",
+            _audit_event(
+                "REGISTER_REPAYMENT",
                 loan_id=loan_id,
                 amount=amount,
                 meta={"customer_id": customer_id, "paid_date": repayment_date},
                 actor="user",
             )
         except Exception as _e:
-            print(f"[WARN] append_audit で警告: {_e}")
-
+            print(f"[WARN] audit で警告: {_e}")
+    
     except Exception as e:
-        print(f"❌ CSV書き込み中にエラーが発生しました: {e}")
-
+        print(f"[ERROR] 返済記録の保存に失敗しました: {e}")
+        return
 
 def register_repayment_api(
     *, loan_id: str, customer_id: str, amount: int, repayment_date: str | None = None
@@ -441,8 +448,8 @@ def register_repayment_api(
             }
         )
 
-    append_audit(
-        event="REGISTER_REPAYMENT",
+    _audit_event(
+        "REGISTER_REPAYMENT",
         loan_id=loan_id,
         amount=amount,
         meta={"customer_id": customer_id, "paid_date": repayment_date},
@@ -1194,48 +1201,6 @@ def is_overdue_with_grace(
 ) -> bool:
     return today > compute_effective_due(due_date_str, grace_period_days)
 
-
-# C-4 監査ログ append_audit()
-AUDIT_PATH = "data/audit_log.csv"
-AUDIT_HEADERS = ["ts", "event", "loan_id", "amount", "meta", "actor"]
-
-
-def append_audit(
-    event: str,
-    loan_id: str,
-    amount: float | int | None = None,
-    meta: dict | None = None,
-    actor: str = "system",
-) -> None:
-    """
-    監査イベントをCSVに追記。
-    adapter (loan_module) 側で AUDIT_PATH が上書きされていればそちらを優先。
-    """
-    audit_path = _resolve_audit_path()  # ★ ここがポイント
-
-    # ディレクトリがある場合のみ作成（ファイル名のみの場合は skip）
-    dirn = os.path.dirname(audit_path)
-    if dirn:
-        os.makedirs(dirn, exist_ok=True)
-
-    file_exists = os.path.exists(audit_path)
-    need_header = (not file_exists) or (os.stat(audit_path).st_size == 0)
-
-    row = {
-        "ts": datetime.now().isoformat(timespec="seconds"),
-        "event": event,
-        "loan_id": str(loan_id) if loan_id is not None else "",
-        "amount": amount if amount is not None else "",
-        "meta": json.dumps(meta, ensure_ascii=False) if meta else "",
-        "actor": actor,
-    }
-    with open(audit_path, "a", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=AUDIT_HEADERS)
-        if need_header:
-            w.writeheader()
-        w.writerow(row)
-
-
 def _get_project_paths_patched():
     """
     tests ではトップレベルの adapter モジュール `loan_module`
@@ -1250,121 +1215,208 @@ def _get_project_paths_patched():
         pass
     return get_project_paths()
 
-
 def _resolve_audit_path() -> str:
     """
-    adapter 側で AUDIT_PATH が上書きされていればそれを使う。
-    そうでなければ元の AUDIT_PATH を使う。
+    audit_log の実体パスを返す。modules.audit から輸入した _AUDIT_FILE を優先。
+    それが無ければ data/audit_log.csv をフォールバック。
     """
     try:
-        mod = sys.modules.get("loan_module")
-        if mod:
-            p = getattr(mod, "AUDIT_PATH", None)
-            if p:
-                return p
+        # modules.audit から import した AUDIT_FILE を優先
+        if _AUDIT_FILE:
+            return str(_AUDIT_FILE)
     except Exception:
         pass
-    return AUDIT_PATH
+    # フォールバック: このファイルの上位 ../data/audit_log.csv
+    base = Path(__file__).resolve().parent.parent
+    return str((base / "data" / "audit_log.csv").resolve())
 
-# === C-9: 契約解除（最小表現）===
 
+
+def _audit_event(event: str, *, loan_id: str, amount: float | int | None = None,
+                 meta: dict | None = None, actor: str = "system") -> None:
+    """
+    既存コードの（event/loan_id/meta…）呼び出しを、modules.audit.append_audit
+    の (action/entity/entity_id/details/actor) 形式へブリッジする薄いラッパ。
+    """
+    details = {}
+    if meta:
+        details.update(meta)
+    if amount is not None:
+        details["amount"] = amount
+
+    _write_audit(
+        action=event,            # 例: "CANCEL_CONTRACT" / "REGISTER_LOAN"
+        entity="loan",
+        entity_id=loan_id,
+        details=details,
+        actor=actor,
+    )
+
+# === C-9: 契約解除（最小表現） ===
 C9_COL_STATUS = "contract_status"
-C9_COL_CANCELLED_AT = "canceled_at"
-C9_COL_REASON = "cancel_reason"
-
-# === C-9: 契約解除（最小表現） ===============================================
-
-C9_COL_STATUS = "contract_status"
-C9_COL_CANCELLED_AT = "cancelled_at"
-C9_COL_REASON = "cancel_reason"
+C9_COL_CANCELLED_AT = "cancelled_at"     
+C9_COL_CANCEL_REASON = "cancel_reason"
+C9_STATUS_CANCELLED  = "CANCELLED"
+C9_STATUS_ACTIVE     = "ACTIVE"  
+COL_LOAN_ID = "loan_id"
 
 def _ensure_c9_columns_or_raise(header: list[str]) -> None:
-    need = {C9_COL_STATUS, C9_COL_CANCELLED_AT, C9_COL_REASON}
+    need = {C9_COL_STATUS, C9_COL_CANCELLED_AT, C9_COL_CANCEL_REASON}
     if not need.issubset(set(header)):
         missing = sorted(list(need - set(header)))
         raise RuntimeError(f"[C-9] loan_v3.csv に必須列がありません。先にマイグレーションを実行してください: {missing}")
 
-def cancel_contract(loan_file: str, loan_id: str, *, reason: str = "", operator: str|None=None) -> bool:
+def _ensure_c9_columns(header, rows):
     """
-    指定 loan_id を CANCELLED に更新し、監査ログへ CANCEL_CONTRACT を記録する。
-    - 既に CANCELLED の場合は False。
-    - 完済済みは解除不可（安全策）。
+    loan_v3.csvにC-9列が無い場合に、ヘッダ＆全行へ安全に追加する。
+    返り値: (header, rows)  いずれも新しいリストを返す
     """
-    # CSV 読み込み
+    need = {C9_COL_STATUS, C9_COL_CANCELLED_AT, C9_COL_CANCEL_REASON}
+    hset = set(header)
+    if need.issubset(hset):
+        return header, rows
+    new_header = header[:]
+    missing = [c for c in (C9_COL_STATUS, C9_COL_CANCELLED_AT, C9_COL_CANCEL_REASON) if c not in hset]
+    new_header.extend(missing)
+    # 既存各行にデフォルトを埋める
+    idx = {name: i for i, name in enumerate(new_header)}
+    out_rows = []
+    for r in rows:
+        rr = r[:] + [""] * (len(new_header) - len(r))
+        if C9_COL_STATUS in missing and not rr[idx[C9_COL_STATUS]]:
+            rr[idx[C9_COL_STATUS]] = C9_STATUS_ACTIVE
+        if C9_COL_CANCELLED_AT in missing and not rr[idx[C9_COL_CANCELLED_AT]]:
+            rr[idx[C9_COL_CANCELLED_AT]] = ""
+        if C9_COL_CANCEL_REASON in missing and not rr[idx[C9_COL_CANCEL_REASON]]:
+            rr[idx[C9_COL_CANCEL_REASON]] = ""
+        out_rows.append(rr)
+    return new_header, out_rows
+
+def cancel_contract(loan_file: str, loan_id: str, *, reason: str = "", operator: str = "CLI") -> bool:
+    """
+    契約をCANCELLEDにして cancelled_at と cancel_reason を埋める。
+    返り値: True=成功 / False=見つからない・既にCANCELLED・（必要なら）完済など
+    例外は基本的に起こさない（IOエラー等は上位に伝播）。
+    """
+
+    # 1) CSV 読み出し
+    import csv
+    import datetime
+
+    # データディレクトリを loan_file から推定
+    try:
+        paths = _get_project_paths_patched()
+        # loan_v3.csv のディレクトリを基準にする
+        DATA_DIR = Path(paths.get("loans_csv", loan_file)).resolve().parent
+    except Exception:
+        # 念のためフォールバック
+        DATA_DIR = Path("data").resolve()
+
     with open(loan_file, "r", newline="", encoding="utf-8-sig") as f:
-        r = csv.reader(f)
-        rows = list(r)
+        rows = list(csv.reader(f))
+
     if not rows:
-        print("[ERROR] 空の loan_v3.csv")
         return False
 
-    header = [h.lstrip("\ufeff").strip().strip('"') for h in rows[0]]
-    _ensure_c9_columns_or_raise(header)
-    idx = {name: i for i, name in enumerate(header)}
+    # 2) ヘッダ正規化（外側クォート/BOM除去）
+    header = [h.lstrip("\ufeff").strip().strip('"').strip("'") for h in rows[0]]
     body = rows[1:]
 
-    # 対象行探索
-    found = None
-    for i, row in enumerate(body):
-        if len(row) <= idx.get("loan_id", -1):
-            continue
-        if row[idx["loan_id"]] == loan_id:
-            found = (i, row)
-            break
-    if not found:
-        print(f"[ERROR] loan_id {loan_id} が見つかりません。")
+    # C-9列を必ず保証
+    header, body = _ensure_c9_columns(header, body)
+
+    # 必須列が揃っているか（schema_migratorで既に整っている想定だが、念のため）
+    needed = {COL_LOAN_ID, C9_COL_STATUS, C9_COL_CANCELLED_AT, C9_COL_CANCEL_REASON}
+    missing = [c for c in needed if c not in header]
+    if missing:
+        # 必須列がないならここで False（本来はマイグレータを先に流す）
         return False
 
-    i, row = found
+    idx = {name: i for i, name in enumerate(header)}
 
-    # 完済済みはブロック
+    # 3) 対象行を探索
+    found_i = None
+    for i, row in enumerate(body):
+        # 行長をヘッダ長にパディング（不足セルを空文字で埋める）
+        if len(row) < len(header):
+            row = row + [""] * (len(header) - len(row))
+            body[i] = row  # パディング反映
+
+        if row[idx[COL_LOAN_ID]] == loan_id:
+            found_i = i
+            break
+
+    if found_i is None:
+        # loan_id が見つからない
+        return False
+
+    row = body[found_i]
+
+    # 4) 既にCANCELLEDか？
+    prev_status = row[idx[C9_COL_STATUS]].strip() if row[idx[C9_COL_STATUS]] else ""
+    if prev_status.upper() == "CANCELLED":
+        print("❌ すでに契約解除済みの貸付です（ダブルキャンセルは無効）。")
+        try:
+            _audit_event(
+                "CANCEL_CONTRACT_SKIPPED",
+                loan_id=row[idx[COL_LOAN_ID]],
+                meta={"reason": "already cancelled", "previous_status": prev_status},
+                actor="user",
+            )
+        except Exception as _e:
+            print(f"[WARN] audit で警告: {_e}")
+        return False
+
+    # 5) 完済済みはキャンセル不可
     try:
-        expected = int(float(row[idx["repayment_expected"]]))
+        expected = int(row[idx["repayment_expected"]])
     except Exception:
         expected = 0
-    total_repaid = calculate_total_repaid_by_loan_id(
-        os.path.join(os.path.dirname(loan_file) or "", "repayments.csv"),
-        loan_id
-    )
-    if total_repaid >= expected:
-        print("[ERROR] 完済済みのため契約解除はできません。")
+
+    repaid_sum = 0
+    try:
+        with open(DATA_DIR / "repayments.csv", newline="", encoding="utf-8-sig") as rf: # type: ignore
+            import csv
+            r = csv.DictReader(rf)
+            for rec in r:
+                if rec.get("loan_id") == loan_id:
+                    try:
+                        repaid_sum += int(rec.get("repayment_amount", 0))
+                    except Exception:
+                        pass
+    except FileNotFoundError:
+        repaid_sum = 0
+
+    if expected > 0 and repaid_sum >= expected:
+        print("❌ この貸付はすでに完済済みのため、契約解除はできません。")
+        print(f"   予定返済額: ¥{expected:,} / 返済合計: ¥{repaid_sum:,}")
         return False
 
-    # 既にCANCELLED？
-    status = row[idx[C9_COL_STATUS]] if C9_COL_STATUS in idx else ""
-    if status == "CANCELLED":
-        print("[WARN] 既にCANCELLEDです。変更なし。")
-        return False
-
-    # 更新
+    # 6) 状態を更新
+    now_iso = datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
     row[idx[C9_COL_STATUS]] = "CANCELLED"
-    row[idx[C9_COL_CANCELLED_AT]] = datetime.now().astimezone().isoformat(timespec="seconds")
-    row[idx[C9_COL_REASON]] = reason or ""
-    body[i] = row
+    row[idx[C9_COL_CANCELLED_AT]] = now_iso
+    row[idx[C9_COL_CANCEL_REASON]] = reason or ""
 
-    # 書き戻し
+    body[found_i] = row
+
+    # 7) 書き戻し（上書き）
     with open(loan_file, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(header)
         w.writerows(body)
 
-    # 監査
-    try:
-        append_audit(
-            event="CANCEL_CONTRACT",
-            loan_id=loan_id,
-            amount="",
-            meta={
-                "previous_status": status or "ACTIVE",
-                "new_status": "CANCELLED",
-                "cancelled_at": row[idx[C9_COL_CANCELLED_AT]],
-                "cancel_reason": reason or "",
-                "operator": operator or "CLI",
-            },
-            actor=operator or "CLI",
-        )
-    except Exception as _e:
-        print(f"[WARN] append_audit で警告: {_e}")
-
-    print(f"✅ 契約解除を登録しました: loan_id={loan_id}")
+    # 8) 監査ログ
+    _audit_event(
+        "CANCEL_CONTRACT",
+        loan_id=loan_id,
+        meta={
+            "previous_status": prev_status or "ACTIVE",
+            "new_status": "CANCELLED",
+            "cancelled_at": now_iso,
+            "cancel_reason": reason or "",
+            "loan_id": loan_id,
+        },
+        actor=operator,
+    )
     return True
