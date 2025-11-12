@@ -10,7 +10,7 @@
 
 
 
-\## TL;DR（最短クイックスタート）
+## TL;DR（最短クイックスタート）
 
 
 
@@ -60,7 +60,7 @@ pip install pytest → pip freeze > requirements.txt で生成できます。
 
 
 
-\## 背景（開発意図・位置づけ）
+## 背景（開発意図・位置づけ）
 
 - 紙の借用書の運用をコード化し、未返済/延滞/回収額 を明確化。
 
@@ -68,7 +68,7 @@ pip install pytest → pip freeze > requirements.txt で生成できます。
 
 
 
-\## 機能ハイライト
+## 機能ハイライト
 
 - 貸付登録：loan\_id 自動付与、due\_date ほか主要項目の記録
 
@@ -84,7 +84,7 @@ pip install pytest → pip freeze > requirements.txt で生成できます。
 
 
 
-\## メニュー（python main.py 実行時）
+## メニュー（python main.py 実行時）
 
 
 
@@ -110,7 +110,7 @@ pip install pytest → pip freeze > requirements.txt で生成できます。
 
 
 
-\## ファイル構成（抜粋）
+## ファイル構成（抜粋）
 
 ```text
 
@@ -174,7 +174,7 @@ pip install pytest → pip freeze > requirements.txt で生成できます。
 
 
 
-\## セットアップ（詳細）
+## セットアップ（詳細）
 
 
 
@@ -204,7 +204,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 
 
 
-\## 使い方（CLI版）
+## 使い方（CLI版）
 
 基本
 
@@ -230,7 +230,7 @@ python .\\main.py
 
 
 
-\## テスト（pytest）
+## テスト（pytest）
 
 ```powershell
 
@@ -258,27 +258,27 @@ pytest -q --maxfail=1 -k <keyword>
 
 
 
-\## スクリーンショット / 出力例
+## スクリーンショット / 出力例
 
 
 
-\### 画面イメージ
+### 画面イメージ
 
 - メニュー画面  
 
-&nbsp; !\[Menu](docs/images/menu.png)
+![Menu](docs/images/menu.png)
 
 - 未返済サマリー（メニュー \[9]）  
 
-&nbsp; !\[Unpaid Summary](docs/images/unpaid\_summary.png)
+![Unpaid Summary](docs/images/unpaid\_summary.png)
 
 - 延滞一覧（メニュー \[10]）  
 
-&nbsp; !\[Overdue List](docs/images/overdue\_list.png)
+![Overdue List](docs/images/overdue\_list.png)
 
 
 
-\### テキスト出力例
+### テキスト出力例
 
 ```text
 
@@ -300,7 +300,7 @@ pytest -q --maxfail=1 -k <keyword>
 
 
 
-\### 返済登録後の計算例
+### 返済登録後の計算例
 
 
 
