@@ -15,7 +15,6 @@ from modules.loan_module import (
     display_repayment_history,
     display_unpaid_loans,
     calculate_late_fee,
-    extract_overdue_loans,
     calculate_total_repaid_by_loan_id,
     is_loan_fully_repaid,
 )
@@ -328,9 +327,12 @@ def main():
             )
             if not customer_id.startswith("CUST"):
                 customer_id = "CUST" + customer_id.zfill(3)
-            extract_overdue_loans(
-                customer_id
-            )  # 顧客IDを受け取り、返済期日を過ぎた貸付だけを表示する
+            display_unpaid_loans(
+                customer_id,
+                loan_file="loan_v3.csv",
+                repayment_file="repayments.csv",
+                filter_mode="overdue",
+            )
 
         elif choice == "0":
             print("終了します。")
