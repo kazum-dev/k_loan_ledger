@@ -102,6 +102,24 @@ def enter_mode(mode_name: str):
     logger.info(f"Enter mode: {mode_name}")
     append_audit("ENTER", "mode", mode_name, None)
 
+def _prompt_date_or_today(prompt: str) -> str:
+    """
+    日付入力用の共通ヘルパー。
+    - 空Enter: 今日の日付を YYYY-MM-DD で自動設定
+    - それ以外: fmt_date で "YYYY-MM-DD" に正規化。失敗したら再入力。
+    """
+    while True:
+        s = input(prompt).strip()
+        if not s:
+            today_str = datetime.today().strftime("%Y-%m-%d")
+            print(f"[INFO] 日付を本日に自動設定しました: {today_str}")
+            return today_str
+
+        normalized = fmt_date(s)
+        if not normalized:
+            print("❌ 日付は YYYY-MM-DD 形式で入力してください（例：2025-05-05）。")
+            continue
+        return normalized
 
 def loan_registration_mode(loans_file):
 
@@ -114,95 +132,141 @@ def loan_registration_mode(loans_file):
     search_customer(keyword)  # 顧客名やIDの一部を検索して該当する顧客を表示する
 
     print("\n=== 貸付記録を登録 ===")
-    customer_id_input = input(
-        "👤顧客IDを入力してください(例：001またはCUST001): "
-    ).strip()
-    customer_id = normalize_customer_id(customer_id_input)
 
+    # 事前に有効な顧客ID一覧を取得しておく
     valid_ids = {normalize_customer_id(x) for x in get_all_customer_ids()}
+    
+    # 👤 顧客ID入力（存在チェック付きループ）
+    while True:
+        customer_id_input = input(
+            "👤顧客IDを入力してください(例：001またはCUST001): "
+        ).strip()
+        customer_id = normalize_customer_id(customer_id_input)
 
-    if customer_id not in valid_ids:
-        print("❌ 顧客IDが存在しません。先に顧客登録を行ってください。")
-        return
+        if customer_id not in valid_ids:
+            print("❌ 顧客IDが存在しません。先に顧客登録を行ってください。")
+            continue
+        break
 
-    # 貸付額を入力・チェック
-    amount_input = input("💰貸付記録を入力してください（例：10000）: ")
+    # 💰 貸付額を入力・チェック（整数・1円以上・上限以内）
+    while True:
+        amount_input = input("💰貸付記録を入力してください（例：10000）: ").strip()
+        try:
+            amount = int(amount_input)
+        except ValueError:
+            print("❌金額は整数で入力してください。")
+            continue
 
-    try:
-        amount = int(amount_input)
         if amount <= 0:
-            print("❌金額は1円以上で入力してください。")
-            return
+            print("❌ 金額は1円以上で入力してください。")
+            continue
 
         # 顧客の貸付上限金額を取得する
-        # 入力金額が上限を超えていないか判定するために使う
         credit_limit = get_credit_limit(customer_id)
         if credit_limit is None:
-            print("❌ 顧客の上限金額を取得できません。")
+            print("❌ 顧客の上限金額を取得できません。処理を中断します。")
             return
-
+        
         if amount > credit_limit:
             print(
-                f"⚠ 上限額({credit_limit}円) を超えています。貸付記録を保存できません。"
+                f"⚠ 上限金額({credit_limit}円) を超えています。別の金額を入力してください。"
             )
-            return
+            continue
 
-    except ValueError:
-        print("❌ 金額は整数で入力してください。")
-        return
+        # ここまで来たらOK
+        break
 
-    # 利率を入力
-    interest_input = input("📈利率（％）を入力してください ※未入力時は10.0%: ").strip()
-    try:
-        interest_rate = float(interest_input) if interest_input else 10.0
+    # 📈 利率を入力（デフォルト 10.0%、 1%以上のみ許可）
+    while True:
+        interest_input = input("📈利率（％）を入力してください ※未入力時は10.0%: ")
+        if not interest_input:
+            interest_rate = 10.0
+            break
+        try:
+            interest_rate = float(interest_input)
+        except ValueError:
+            print("❌ 利率は数値で入力してください。")
+            continue
+
         if interest_rate <= 0:
             print("❌ 利率は1%以上で入力してください。")
-            return
-    except ValueError:
-        print("❌ 利率は数値で入力してください。")
-        return
+            continue
+        break
 
-    # 貸付日を入力
-    loan_date = input(
-        "📅貸付日を入力(例：2025-05-05)※未入力なら今日の日付になります: "
-    ).strip()
-    loan_date = fmt_date(loan_date) or datetime.today().strftime("%Y-%m-%d")
+    # 貸付日を入力（形式＋存在チェック付きで再入力ループ）
+    while True:
+        raw = input(
+            "📅貸付日を入力(例：2025-05-05)※未入力なら今日の日付になります: "
+        ).strip()
 
-    # 返済方法を入力
+        # 空なら今日
+        if raw == "":
+            loan_date = datetime.today().strftime("%Y-%m-%d")
+            print(f"[INFO] 貸付日は本日に自動設定しました: {loan_date}")
+            break
+
+        # まず fmt_date で "YYYY-MM-DD" に正規化（/ や . も許容）
+        normalized = fmt_date(raw)
+        if normalized is None:
+            print("❌ 日付の形式が不正です。YYYY-MM-DD 形式で入力してください。")
+            continue
+
+        # ここで「カレンダー的に存在するか」までチェックする
+        try:
+            datetime.strptime(normalized, "%Y-%m-%d")
+        except ValueError:
+            print("❌ 存在しない日付です。正しい日付を入力してください。")
+            continue
+
+        loan_date = normalized
+        break
+
+
+    # 💳 返済方法を入力（normalize_method のまま使用） 
     repayment_method = input("💳返済方法を入力してください（例：現金／振込）: ").strip()
-    repayment_method = normalize_method(repayment_method)  # "CASH" 等に標準化
+    repayment_method = normalize_method(repayment_method) # "CASH" 等に標準化
     if repayment_method == "UNKNOWN":
-        repayment_method = "UNKNOWN"
+        print("⚠ 返済方法が特定できないため UNKNOWN として登録します。")
 
-    # ⏳延滞猶予日数を入力
-    grace_input = input(
-        "⏳延滞猶予日数（日数）を入力してください（例：5) ※未入力なら0日: "
-    ).strip()
-    try:
-        grace_period_days = int(grace_input) if grace_input else 0
+    # ⏳ 延滞猶予日数を入力（整数・0以上）
+    while True:
+        grace_input = input(
+            "⏳延滞予定日数（日数）を入力してください（例：5）※未入力なら0日: "
+        ).strip()
+        if not grace_input:
+            grace_period_days = 0
+            break
+        try:
+            grace_period_days = int(grace_input)
+        except ValueError:
+            print("❌ 猶予日数は整数で入力してください。")
+            continue
+
         if grace_period_days < 0:
             print("❌ 猶予日数は0以上で入力してください。")
-            return
-    except ValueError:
-        print("❌ 猶予日数は整数で入力してください。")
-        return
+            continue
+        break
 
-    # 🔧 延滞利率の入力処理
-    late_fee_input = input(
-        "🔢 延滞利率（％）を入力してください（例：10.0） ※未入力で10.0: "
-    ).strip()
-    try:
-        late_fee_rate_percent = (
-            round(float(late_fee_input), 1) if late_fee_input else 10.0
-        )  # デフォルトは10.0
-        if late_fee_rate_percent < 0:  # 負の値はエラー
+    # 🔢 延滞利率の入力（デフォルト 10.0%、0以上の数値）
+    while True:
+        late_fee_input = input(
+            "🔢 延滞利率 (%) を入力してください（例：10.0）※未入力で10.0: "
+        ).strip()
+        if not late_fee_input:
+            late_fee_rate_percent = 10.0
+            break
+        try:
+            late_fee_rate_percent = round(float(late_fee_input), 1)
+        except ValueError:
+            print("❌ 延滞利率は数値で入力してください。")
+            continue
+
+        if late_fee_rate_percent < 0:
             print("❌ 延滞利率は0以上で入力してください。")
-            return
-    except ValueError:  # 数値じゃないのもエラー
-        print("❌ 延滞利率は数値で入力してください。")
-        return
-    # late_fee_rate_percent を loan_module.py の register_loan に渡す
-    # デフォルトは 10.0、キーワード引数で渡すことで順番ミスを防ぐ
+            continue
+        break
+
+    # ここまでバリテーション通過 → register_loan に渡す
     register_loan(
         customer_id,
         amount,
@@ -213,7 +277,6 @@ def loan_registration_mode(loans_file):
         late_fee_rate_percent=late_fee_rate_percent,
         file_path=loans_file,
     )
-
 
 def loan_history_mode(loans_file):
     print("=== 履歴表示モード ===")
@@ -279,14 +342,14 @@ def repayment_registration_mode(loans_file, repayments_file):
         else:
             print("[ERROR] 数字かつ1円以上を入力してください。")
 
-    # 返済日入力
-    repayment_date = input(
-        "返済日を入力してください (YYYY-MM-DD、未入力で今日の日付): "
+    # 返済日入力（フォーマット検証＋空Enterで今日）
+    repayemnt_date = _prompt_date_or_today(
+        "返済日を入力してください（YYYY-MM-DD、未入力で今日の日付）: "
     ).strip()
     if repayment_date == "":
         repayment_date = datetime.today().strftime("%Y-%m-%d")
         print(f"[INFO] 返済日は本日に自動設定しました: {repayment_date}")
-
+    
     # 追記
     row = {
         "loan_id": loan_id,
