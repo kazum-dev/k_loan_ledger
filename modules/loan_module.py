@@ -110,6 +110,7 @@ def register_loan(
     grace_period_days=0,
     late_fee_rate_percent=10,
     file_path=None,  # ← ここを None に
+    notes: str = "", # C-12 備考欄　デフォルト空文字
 ):
     # === 追加: パス自動解決 ===
     if not file_path:
@@ -142,6 +143,8 @@ def register_loan(
         "contract_status",
         "cancelled_at",
         "cancel_reason",
+        # C-12 追加
+        "notes",
     ]
 
     # 返済期日が未入力なら 貸付日（loan_date） の30日後をデフォルト設定
@@ -207,7 +210,11 @@ def register_loan(
                     late_fee_rate_percent,
                     late_base_amount,
                     # C-9 の初期値
-                    "ACTIVE", "", "",
+                    "ACTIVE",
+                    "",
+                    "",
+                    # C-12 notes
+                    notes,
                 ]
             )
 
@@ -273,6 +280,11 @@ def display_loan_history(customer_id, filepath):
                 except Exception:
                     pass
                 print(f"{date_str}｜{amount_str}｜返済期日：{due_date}{tag}")
+
+                # C-12: 備考があれば表示
+                notes = (row.get("notes") or "").strip()
+                if notes:
+                    print(f"    その他条件：{notes}")
 
 
         else:

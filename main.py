@@ -150,7 +150,7 @@ def loan_registration_mode(loans_file):
 
     # 💰 貸付額を入力・チェック（整数・1円以上・上限以内）
     while True:
-        amount_input = input("💰貸付記録を入力してください（例：10000）: ").strip()
+        amount_input = input("💰貸付金額を入力してください（例：10000）: ").strip()
         try:
             amount = int(amount_input)
         except ValueError:
@@ -266,6 +266,9 @@ def loan_registration_mode(loans_file):
             continue
         break
 
+    # C-12: 備考入力フック
+    notes = input("📝 その他条件/備考があれば入力（未入力でスキップ）: ").strip()
+
     # ここまでバリテーション通過 → register_loan に渡す
     register_loan(
         customer_id,
@@ -276,6 +279,7 @@ def loan_registration_mode(loans_file):
         grace_period_days=grace_period_days,
         late_fee_rate_percent=late_fee_rate_percent,
         file_path=loans_file,
+        notes=notes,
     )
 
 def loan_history_mode(loans_file):
@@ -413,6 +417,8 @@ def main():
             "grace_period_days","late_fee_rate_percent","late_base_amount",
             # C-9
             "contract_status","cancelled_at","cancel_reason",
+            # C-12
+            "notes",
         })
         validate_schema(paths["repayments_csv"], {
             "loan_id","customer_id","repayment_amount","repayment_date",
@@ -460,6 +466,8 @@ def main():
             "late_base_amount",
             # C-9
             "contract_status","cancelled_at","cancel_reason",
+            # C-12
+            "notes",
         },
     )
     validate_schema(
