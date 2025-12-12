@@ -347,12 +347,9 @@ def repayment_registration_mode(loans_file, repayments_file):
             print("[ERROR] 数字かつ1円以上を入力してください。")
 
     # 返済日入力（フォーマット検証＋空Enterで今日）
-    repayemnt_date = _prompt_date_or_today(
+    repayment_date = _prompt_date_or_today(
         "返済日を入力してください（YYYY-MM-DD、未入力で今日の日付）: "
-    ).strip()
-    if repayment_date == "":
-        repayment_date = datetime.today().strftime("%Y-%m-%d")
-        print(f"[INFO] 返済日は本日に自動設定しました: {repayment_date}")
+    )
     
     # 追記
     row = {

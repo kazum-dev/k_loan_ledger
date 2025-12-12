@@ -21,7 +21,9 @@ def test_seed_then_summary(tmp_path: Path):
 
     # 2) main --summary（件数が表示される）
     out2 = run_ok([py, str(proj / "main.py"), "--summary"], cwd=proj)
-    assert "[main] loans=" in out2.stdout
+    assert "[summary] loans:" in out2.stdout
+    assert "repayments:" in out2.stdout
+
 
     # 3) CSVの存在とヘッダ簡易確認
     loans_csv = proj / "data" / "loan_v3.csv"

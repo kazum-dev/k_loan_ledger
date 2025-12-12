@@ -12,7 +12,7 @@ from modules.utils import (
 from decimal import Decimal, ROUND_HALF_UP, getcontext
 from enum import Enum
 from pathlib import Path
-from modules.audit import append_audit as _write_audit, AUDIT_FILE as _AUDIT_FILE
+from modules.audit import append_audit as _write_audit, AUDIT_PATH as _AUDIT_PATH
 
 getcontext().prec = 28
 VERBOSE_AUDIT = True  # 本番で抑えたいときは False
@@ -1050,13 +1050,13 @@ def _get_project_paths_patched():
 
 def _resolve_audit_path() -> str:
     """
-    audit_log の実体パスを返す。modules.audit から輸入した _AUDIT_FILE を優先。
+    audit_log の実体パスを返す。modules.audit から輸入した _AUDIT_PATH を優先。
     それが無ければ data/audit_log.csv をフォールバック。
     """
     try:
-        # modules.audit から import した AUDIT_FILE を優先
-        if _AUDIT_FILE:
-            return str(_AUDIT_FILE)
+        # modules.audit から import した AUDIT_PATH を優先
+        if _AUDIT_PATH:
+            return str(_AUDIT_PATH)
     except Exception:
         pass
     # フォールバック: このファイルの上位 ../data/audit_log.csv

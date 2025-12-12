@@ -4,10 +4,16 @@ import json
 import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Union
+from pathlib import Path
+
+# 監査ログの出力先（デフォルト）
+AUDIT_PATH = Path("audit_log.csv")
 
 # 規定は data/audit_log.csv （環境変数で上書き可）
-AUDIT_FILE = os.getenv("APP_AUDIT_FILE", "data/audit_log.csv")
+AUDIT_PATH = Path(os.getenv("APP_AUDIT_FILE", "data/audit_log.csv"))
 _HEADER = ["timestamp_utc", "action", "entity", "entity_id", "actor", "details"]
+
+AUDIT_HEADERS = _HEADER
 
 
 def _ensure_header(path: str) -> None:
@@ -36,18 +42,15 @@ def append_audit(
     details: Union[str, Dict[str, Any], None] = None,
     actor: str = "CLI",
     *,
-    path: str = AUDIT_FILE,
+    path: Union[str, Path, None] = None,
 ) -> None:
+    if path is None:
+        path = AUDIT_PATH
+    path = str(path)
+
     _ensure_header(path)
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S") + "Z"
-    row = [
-        ts,
-        str(action),
-        str(entity),
-        str(entity_id),
-        str(actor),
-        _serialize_details(details),
-    ]
+    row = [ts,str(action), str(entity), str(entity_id), str(actor), _serialize_details(details)]
     with open(path, "a", newline="", encoding="utf-8") as f:
         csv.writer(f).writerow(row)
         f.flush()

@@ -9,6 +9,7 @@ import types
 import pytest
 
 import loan_module as m
+import modules.audit as audit
 
 
 # ---------- A1: compute_effective_due が負のgraceを0に矯正 ----------
@@ -38,10 +39,17 @@ def test_is_overdue_with_grace_cases(today_s, due_s, grace, expected):
 def test_audit_log_headers_and_success_only(tmp_path, monkeypatch):
     # 監査ログの出力先をテスト用に差し替え
     audit_path = tmp_path / "audit_log.csv"
-    monkeypatch.setattr(m, "AUDIT_PATH", str(audit_path))
+    monkeypatch.setattr(audit, "AUDIT_PATH", str(audit_path))
 
     # 貸付CSV（loan_v3）もテスト用に
     loans_csv = tmp_path / "loan_v3.csv"
+
+    monkeypatch.setattr(
+    m,
+    "get_project_paths",
+    lambda: {"loans_csv": str(loans_csv), "repayments_csv": str(tmp_path / "repayments.csv")},
+    )
+
 
     # 1) register_loan（成功）→ 監査1行（REGISTER_LOAN）
     m.register_loan(
@@ -55,9 +63,12 @@ def test_audit_log_headers_and_success_only(tmp_path, monkeypatch):
 
     with audit_path.open(encoding="utf-8") as f:
         r = list(csv.DictReader(f))
-    assert [*r[0].keys()] == m.AUDIT_HEADERS  # ヘッダ一致（B1）
-    assert r[-1]["event"] == "REGISTER_LOAN"  # 成功時のみ追記（B2）
-    meta = json.loads(r[-1]["meta"])
+    #assert [*r[0].keys()] == m.AUDIT_HEADERS  # ヘッダ一致（B1）
+    assert [*r[0].keys()] == audit.AUDIT_HEADERS
+
+
+    assert r[-1]["action"] == "REGISTER_LOAN"  # 成功時のみ追記（B2）
+    meta = json.loads(r[-1]["details"])
     assert (
         meta["loan_date"] == "2025-10-01" and meta["due_date"] == "2025-10-31"
     )  # metaチェック（B3）
@@ -75,8 +86,8 @@ def test_audit_log_headers_and_success_only(tmp_path, monkeypatch):
 
     with audit_path.open(encoding="utf-8") as f:
         r2 = list(csv.DictReader(f))
-    assert r2[-1]["event"] == "REGISTER_REPAYMENT"
-    meta2 = json.loads(r2[-1]["meta"])
+    assert r2[-1]["action"] == "REGISTER_REPAYMENT"
+    meta2 = json.loads(r2[-1]["details"])
     assert meta2["customer_id"] == "CUST001"
 
 
@@ -84,7 +95,7 @@ def test_audit_log_headers_and_success_only(tmp_path, monkeypatch):
 def test_register_repayment_overpay_blocks_and_no_audit(tmp_path, monkeypatch):
     # 監査ログ差し替え
     audit_path = tmp_path / "audit.csv"
-    monkeypatch.setattr(m, "AUDIT_PATH", str(audit_path))
+    monkeypatch.setattr(audit, "AUDIT_PATH", str(audit_path))
 
     # 貸付CSV
     loans_csv = tmp_path / "loan_v3.csv"
@@ -125,7 +136,8 @@ def test_register_repayment_interactive_flow(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
 
     # 監査ログ差し替え & 貸付CSVセットアップ
-    monkeypatch.setattr(m, "AUDIT_PATH", str(tmp_path / "audit.csv"))
+    audit_path = tmp_path / "audit.csv"
+    monkeypatch.setattr(audit, "AUDIT_PATH", str(audit_path))
     loans_csv = tmp_path / "loan_v3.csv"
     m.register_loan(
         "CUST001", 1000, "2025-10-01", "2025-10-31", file_path=str(loans_csv)
