@@ -13,6 +13,7 @@ from decimal import Decimal, ROUND_HALF_UP, getcontext
 from enum import Enum
 from pathlib import Path
 from modules.audit import append_audit as _write_audit, AUDIT_PATH as _AUDIT_PATH
+from modules.audit import append_audit
 
 getcontext().prec = 28
 VERBOSE_AUDIT = True  # 本番で抑えたいときは False
@@ -543,6 +544,83 @@ def is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
         return False
 
     return True
+
+# D-2
+
+REPAYMENTS_HEADER = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
+
+def _ensure_repayments_csv_initialized(repayments_csv_path: str) -> None:
+    file_exists = os.path.exists(repayments_csv_path)
+    need_header = (not file_exists) or (os.stat(repayments_csv_path).st_size == 0)
+    if need_header:
+        with open(repayments_csv_path, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=REPAYMENTS_HEADER)
+            w.writeheader()
+
+def register_repayment_complete(
+    *,
+    loans_file: str,
+    repayments_file: str,
+    loan_id: str,
+    amount: int,
+    repayment_date: str,
+    actor: str = "CLI",
+) -> dict | None:
+    """
+    D-2: 返済登録を loan_module 側で完結させる(main.py からCSV書き込みを撤去するため)
+    成功時: 追記row(dict)を返す / 失敗時: None
+    """
+
+    # loan_id存在確認
+    info = get_loan_info_by_loan_id(loans_file, loan_id)
+    if not info:
+        print(f"[ERROR] loan_id {loan_id} が {os.path.basename(loans_file)} に存在しません。")
+        return None
+    
+    # 契約解除済みはブロック
+    if info.get("contract_status") == "CANCELLED":
+        print(f"[ERROR] loan_id {loan_id} は契約解除済みのため返済登録できません。")
+        return None
+    
+    # 金額バリテーション
+    if not isinstance(amount, int) or amount <= 0:
+        print("[ERROR] 返済金額は1円以上の整数で入力してください。")
+        return None
+    
+    # repayments 初期化（ヘッダー）
+    _ensure_repayments_csv_initialized(repayments_file)
+
+    # 過剰返済チェック（OKなら True / NGなら False）
+    if not is_over_repayment(loans_file, repayments_file, loan_id, amount):
+        return None
+    
+    customer_id = info.get("customer_id")
+
+    row = {
+        "loan_id": loan_id,
+        "customer_id": customer_id,
+        "repayment_amount": amount,
+        "repayment_date": repayment_date,
+    }
+
+    # 追記
+    with open(repayments_file, "a", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=REPAYMENTS_HEADER)
+        w.writerow(row)
+
+    # 監査（成功時のみ）
+    try:
+        append_audit(
+            action="REGISTER_REPAYMENT",
+            entity="loan",
+            entity_id=loan_id,
+            details={"customer_id": customer_id, "amount": amount, "paid_date": repayment_date},
+            actor=actor,
+        )
+    except Exception as _e:
+        print(f"[WARN] audit で警告: {_e}")
+
+    return row
 
 
 # 顧客IDごとの返済履歴を表示する関数
