@@ -349,23 +349,27 @@ def register_repayment():
         return
     
     try:
-        header = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
         file_exists = os.path.exists(repayments_csv_path)
         need_header = (not file_exists) or (os.stat(repayments_csv_path).st_size == 0)
 
         with open(repayments_csv_path, mode="a", newline="", encoding="utf-8") as file:
-            writer = csv.DictWriter(file, fieldnames=header)
+            writer = csv.DictWriter(file, fieldnames=REPAYMENTS_HEADER)
+
             if need_header:
                 writer.writeheader()
+
             writer.writerow(
                 {
                     "loan_id": loan_id,
                     "customer_id": customer_id,
                     "repayment_amount": amount,
                     "repayment_date": repayment_date,
+                    "payment_type": "REPAYMENT",  # ← 旧モードでも必ず明示
                 }
             )
+
         print(f"✅ {customer_id} の返済記録を保存しました。")
+
 
         # ★C-4 監査フック（成功時のみ）
         try:
@@ -443,23 +447,38 @@ def register_repayment_api(
 
     if not is_over_repayment(loans_csv_path, repayments_csv_path, loan_id, amount):
         return False
-
-    header = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
-    file_exists = os.path.exists(repayments_csv_path)
-    need_header = (not file_exists) or (os.stat(repayments_csv_path).st_size == 0)
+    
+    # ここで repayments のスキーマ/ヘッダーを必ず保証（5列）
+    _ensure_repayments_csv_initialized(repayments_csv_path)
 
     with open(repayments_csv_path, "a", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=header)
-        if need_header:
-            w.writeheader()
+        w = csv.DictWriter(f, fieldnames=REPAYMENTS_HEADER)
         w.writerow(
             {
                 "loan_id": loan_id,
                 "customer_id": customer_id,
-                "repayment_amount": amount,
+                "repayment_amount": str(amount),
                 "repayment_date": repayment_date,
+                "payment_type": "REPAYMENT", # ★ D-2.1:必ず明示
             }
         )
+
+    #header = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
+    #file_exists = os.path.exists(repayments_csv_path)
+    #need_header = (not file_exists) or (os.stat(repayments_csv_path).st_size == 0)
+
+    #with open(repayments_csv_path, "a", newline="", encoding="utf-8") as f:
+        #w = csv.DictWriter(f, fieldnames=header)
+        #if need_header:
+            #w.writeheader()
+        #w.writerow(
+            #{
+                #"loan_id": loan_id,
+                #"customer_id": customer_id,
+                #"repayment_amount": amount,
+                #"repayment_date": repayment_date,
+            #}
+        #)
 
     _audit_event(
         "REGISTER_REPAYMENT",
@@ -482,7 +501,7 @@ def get_loan_info_by_loan_id(file_path, loan_id):
 
 
 # B-11.1 repayments.csvから返済合計を取得
-def get_total_repaid_amount(file_path, loan_id):
+#def get_total_repaid_amount(file_path, loan_id):
     total = 0
     try:
         with open(file_path, newline="", encoding="utf-8-sig") as file:
@@ -498,6 +517,9 @@ def get_total_repaid_amount(file_path, loan_id):
         return 0
     return total
 
+# D-2.1
+def get_total_reapid_amount(file_path, loan_id):
+    return calculate_total_repaid_by_loan_id(file_path, loan_id)
 
 # ▼ B-11.2 過剰返済チェックの共通関数
 def is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
@@ -528,7 +550,8 @@ def is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
         return False
 
     # loan_idに対する返済の合計額を取得
-    total_repaid = get_total_repaid_amount(repayments_file, loan_id)
+    # total_repaid = get_total_repaid_amount(repayments_file, loan_id)
+    total_repaid = calculate_total_repaid_by_loan_id(repayments_file, loan_id) 
 
     # 合計返済額 + 入力額 > 予定返済額 か判定
     if total_repaid + repayment_amount > repayment_expected:
@@ -547,7 +570,7 @@ def is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
 
 # D-2
 
-REPAYMENTS_HEADER = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
+REPAYMENTS_HEADER = ["loan_id", "customer_id", "repayment_amount", "repayment_date", "payment_type"]
 
 def _ensure_repayments_csv_initialized(repayments_csv_path: str) -> None:
     file_exists = os.path.exists(repayments_csv_path)
@@ -557,71 +580,239 @@ def _ensure_repayments_csv_initialized(repayments_csv_path: str) -> None:
             w = csv.DictWriter(f, fieldnames=REPAYMENTS_HEADER)
             w.writeheader()
 
-def register_repayment_complete(
-    *,
-    loans_file: str,
-    repayments_file: str,
-    loan_id: str,
-    amount: int,
-    repayment_date: str,
-    actor: str = "CLI",
-) -> dict | None:
+#def register_repayment_complete(
+    #*,
+    #loans_file: str,
+    #repayments_file: str,
+    #loan_id: str,
+    #amount: int,
+    #repayment_date: str,
+    #actor: str = "CLI",
+#) -> dict | None:
     """
     D-2: 返済登録を loan_module 側で完結させる(main.py からCSV書き込みを撤去するため)
     成功時: 追記row(dict)を返す / 失敗時: None
     """
 
     # loan_id存在確認
-    info = get_loan_info_by_loan_id(loans_file, loan_id)
-    if not info:
-        print(f"[ERROR] loan_id {loan_id} が {os.path.basename(loans_file)} に存在しません。")
-        return None
+    #info = get_loan_info_by_loan_id(loans_file, loan_id)
+    #if not info:
+        #print(f"[ERROR] loan_id {loan_id} が {os.path.basename(loans_file)} に存在しません。")
+        #return None
     
     # 契約解除済みはブロック
-    if info.get("contract_status") == "CANCELLED":
-        print(f"[ERROR] loan_id {loan_id} は契約解除済みのため返済登録できません。")
-        return None
+    #if info.get("contract_status") == "CANCELLED":
+        #print(f"[ERROR] loan_id {loan_id} は契約解除済みのため返済登録できません。")
+        #return None
     
     # 金額バリテーション
-    if not isinstance(amount, int) or amount <= 0:
-        print("[ERROR] 返済金額は1円以上の整数で入力してください。")
-        return None
+    #if not isinstance(amount, int) or amount <= 0:
+        #print("[ERROR] 返済金額は1円以上の整数で入力してください。")
+        #return None
     
     # repayments 初期化（ヘッダー）
-    _ensure_repayments_csv_initialized(repayments_file)
+    #_ensure_repayments_csv_initialized(repayments_file)
 
     # 過剰返済チェック（OKなら True / NGなら False）
-    if not is_over_repayment(loans_file, repayments_file, loan_id, amount):
-        return None
+    #if not is_over_repayment(loans_file, repayments_file, loan_id, amount):
+        #return None
     
-    customer_id = info.get("customer_id")
+    #customer_id = info.get("customer_id")
 
-    row = {
-        "loan_id": loan_id,
-        "customer_id": customer_id,
-        "repayment_amount": amount,
-        "repayment_date": repayment_date,
-    }
+    #row = {
+        #"loan_id": loan_id,
+        #"customer_id": customer_id,
+        #"repayment_amount": amount,
+        #"repayment_date": repayment_date,
+    #}
 
     # 追記
-    with open(repayments_file, "a", newline="", encoding="utf-8") as f:
-        w = csv.DictWriter(f, fieldnames=REPAYMENTS_HEADER)
-        w.writerow(row)
+    #with open(repayments_file, "a", newline="", encoding="utf-8") as f:
+        #w = csv.DictWriter(f, fieldnames=REPAYMENTS_HEADER)
+        #w.writerow(row)
 
     # 監査（成功時のみ）
+    #try:
+        #append_audit(
+            #action="REGISTER_REPAYMENT",
+            #entity="loan",
+            #entity_id=loan_id,
+            #details={"customer_id": customer_id, "amount": amount, "paid_date": repayment_date},
+            #actor=actor,
+        #)
+    #except Exception as _e:
+        #print(f"[WARN] audit で警告: {_e}")
+
+    #return row
+
+# D-2.1
+def register_repayment_complete(
+    *,
+    loans_file: str,
+    repayments_file: str,
+    loan_id: str,
+    amount: int,                 # ← 入力は「合計額」として扱う
+    repayment_date: str,
+    actor: str = "CLI",
+) -> dict | None:
+    """
+    D-2.1 + DoD-6:
+    - amount は「合計支払い額」
+    - 合計を REPAYMENT / LATE_FEE に自動配分してCSVに複数行で書く
+    - 返り値は「summary(dict)」に統一（written_rowsも含める）
+    """
+
+    # 1) repayments.csv のスキーマ保証（payment_type列など）
+    _ensure_repayments_schema(repayments_file)
+
+    # 2) 日付
+    repay_day = _parse_date_yyyy_mm_dd(repayment_date)
+
+    # 3) loan を探す
+    info = None
+    with open(loans_file, "r", newline="", encoding="utf-8-sig") as f:
+        r = csv.DictReader(f)
+        for row in r:
+            if row.get("loan_id") == loan_id:
+                info = row
+                break
+    if info is None:
+        print(f"[ERROR] loan_id {loan_id} が loans に見つかりません。")
+        return None
+
+    # CANCELLED はブロック（仕様として安全）
+    if (info.get("contract_status") or "ACTIVE").upper() == "CANCELLED":
+        print(f"[ERROR] loan_id {loan_id} は契約解除済みのため返済登録できません。")
+        return None
+
+    # 4) 予定返済額と、現時点の返済累計（REPAYMENTのみ）
+    total_repaid = calculate_total_repaid_by_loan_id(repayments_file, loan_id)
+    expected = int(float(info.get("repayment_expected", 0) or 0))
+    remaining_now = max(0, expected - total_repaid)
+
+    # 5) 返済日基準で「その時点までの延滞手数料」を算出
+    due_str = info.get("due_date", "")
+    grace = int(info.get("grace_period_days", 0) or 0)
+    late_rate = float(info.get("late_fee_rate_percent", 10.0) or 10.0)
     try:
-        append_audit(
-            action="REGISTER_REPAYMENT",
-            entity="loan",
-            entity_id=loan_id,
-            details={"customer_id": customer_id, "amount": amount, "paid_date": repayment_date},
-            actor=actor,
+        late_base = int(float(info.get("late_base_amount", expected)))
+    except Exception:
+        late_base = expected
+
+    late_fee_accrued_now = 0
+    if due_str:
+        calc = compute_recovery_amount(
+            repayment_expected=expected,
+            total_repaid=total_repaid,
+            today=repay_day,
+            due_date_str=due_str,
+            grace_period_days=grace,
+            late_fee_rate_percent=late_rate,
+            late_base_amount=late_base,
         )
-    except Exception as _e:
-        print(f"[WARN] audit で警告: {_e}")
+        late_fee_accrued_now = int(calc["late_fee"])
 
-    return row
+    late_fee_paid_total = calculate_total_late_fee_paid_by_loan_id(repayments_file, loan_id)
+    late_fee_remaining_now = max(0, late_fee_accrued_now - late_fee_paid_total)
 
+    # 6) 入力合計が「残 + 延滞手数料残」を超えたらブロック
+    total_due_now = remaining_now + late_fee_remaining_now
+    if amount <= 0:
+        print("[ERROR] 返済金額は1円以上の整数で入力してください。")
+        return None
+    if amount > total_due_now:
+        print("❌ 入力額が『残高＋延滞手数料残』を超えるため、この返済は記録しません。")
+        print(f"   入力：¥{amount:,} / 残：¥{remaining_now:,} / 延滞手数料残：¥{late_fee_remaining_now:,} / 合計上限：¥{total_due_now:,}")
+        return None
+
+    # 7) 自動配分（先にREPAYMENT→残りをLATE_FEE）
+    repayment_part = min(remaining_now, amount)
+    leftover = amount - repayment_part
+    fee_part = min(late_fee_remaining_now, leftover)
+
+    # 8) 書き込み先を data 配下に統一（迷子対策）
+    #if (not repayments_file) or os.path.basename(repayments_file) == "repayments.csv":
+        #paths = _get_project_paths_patched()
+        #repayments_file = str(paths["repayments_csv"])
+    #print(f"[DEBUG] repayments_csv_path = {repayments_file}")
+
+    # === FIX（絞り込み版）: “相対でrepayments.csv” のときだけ data 配下に寄せる ===
+    try:
+        p = Path(repayments_file)
+        is_relative_repayments_csv = (p.name.lower() == "repayments.csv" and not p.is_absolute())
+    except Exception:
+        is_relative_repayments_csv = False
+
+    if is_relative_repayments_csv:
+        paths = _get_project_paths_patched()
+        repayments_file = str(paths["repayments_csv"])
+
+    print(f"[DEBUG] repayments_csv_path = {repayments_file}")
+
+    written_rows = []
+    with open(repayments_file, "a", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=REPAYMENTS_HEADER)
+
+        if repayment_part > 0:
+            row1 = {
+                "loan_id": loan_id,
+                "customer_id": info.get("customer_id"),
+                "repayment_amount": str(repayment_part),
+                "repayment_date": repayment_date,
+                "payment_type": "REPAYMENT",
+            }
+            w.writerow(row1)
+            written_rows.append(row1)
+
+            append_audit(
+                action="REGISTER_REPAYMENT",
+                entity="loan",
+                entity_id=loan_id,
+                details={
+                    "customer_id": info.get("customer_id"),
+                    "amount": repayment_part,
+                    "paid_date": repayment_date,
+                    "payment_type": "REPAYMENT",
+                },
+                actor=actor,
+            )
+
+        if fee_part > 0:
+            row2 = {
+                "loan_id": loan_id,
+                "customer_id": info.get("customer_id"),
+                "repayment_amount": str(fee_part),
+                "repayment_date": repayment_date,
+                "payment_type": "LATE_FEE",
+            }
+            w.writerow(row2)
+            written_rows.append(row2)
+
+            append_audit(
+                action="REGISTER_REPAYMENT",
+                entity="loan",
+                entity_id=loan_id,
+                details={
+                    "customer_id": info.get("customer_id"),
+                    "amount": fee_part,
+                    "paid_date": repayment_date,
+                    "payment_type": "LATE_FEE",
+                },
+                actor=actor,
+            )
+
+    # 9) 返り値は summary(dict) に統一
+    return {
+        "loan_id": loan_id,
+        "customer_id": info.get("customer_id"),
+        "input_total": amount,
+        "repayment_part": repayment_part,
+        "late_fee_part": fee_part,
+        "remaining_before": remaining_now,
+        "late_fee_remaining_before": late_fee_remaining_now,
+        "written_rows": written_rows,
+        "repayments_file": repayments_file,
+    }
 
 # 顧客IDごとの返済履歴を表示する関数
 def display_repayment_history(customer_id, filepath="repayments.csv"):
@@ -803,11 +994,29 @@ def display_unpaid_loans(
                         late_base_amount=late_base_amount,
                     )
 
+                    late_fee_paid_total = calculate_total_late_fee_paid_by_loan_id(repayment_file, loan_id)
                     
+                    # overdue_days = info["overdue_days"]
+                    #late_fee = info["late_fee"]
+                    #remaining = info["remaining"]
+                    #recovery_amount = info["recovery_total"]
                     overdue_days = info["overdue_days"]
-                    late_fee = info["late_fee"]
+
+                    # 返済日(=today)基準で発生している延滞手数料（総額）
+                    late_fee_accrued_now = info["late_fee"]
+
+                    # すでに支払われた延滞手数料（LATE_FEEの合計）を差し引く
+                    late_fee_remaining_now = max(0, late_fee_accrued_now - late_fee_paid_total)
+
+                    # 画面に出す late_fee は 「残」
+                    late_fee = late_fee_remaining_now
+
+                    # 残元本(利息込み)は従来通り
                     remaining = info["remaining"]
-                    recovery_amount = info["recovery_total"]
+
+                    # 回収額も「残 + 延滞手数料」
+                    recovery_amount = remaining + late_fee_remaining_now
+
                     status = "OVERDUE" if overdue_days > 0 else "UNPAID"
 
                 except ValueError:
@@ -824,7 +1033,10 @@ def display_unpaid_loans(
             if recovery_amount is None:
                 recovery_amount = remaining + (late_fee or 0)
             extra = (
-                f"{sep}延滞日数：{overdue_days}日{sep}延滞手数料：¥{late_fee:,}{sep}回収額：¥{recovery_amount:,}"
+                f"{sep}延滞日数：{overdue_days}日"
+                f"{sep}延滞手数料残：¥{late_fee_remaining_now:,}"
+                f"{sep}(支払済：¥{late_fee_paid_total:,})"
+                f"{sep}回収額：¥{recovery_amount:,}"
                 if status == "OVERDUE"
                 else ""
             )
@@ -934,7 +1146,7 @@ def calculate_late_fee(
     )
     return overdue_days, int(round(fee))
 
-def calculate_total_repaid_by_loan_id(repayments_file, loan_id):
+# def calculate_total_repaid_by_loan_id(repayments_file, loan_id):
     """
     repayments.csv のヘッダー表記ゆれを吸収しつつ、loan_id ごとの累計返済額を合算。
     """
@@ -974,6 +1186,57 @@ def calculate_total_repaid_by_loan_id(repayments_file, loan_id):
         print(f"[ERROR] 想定外のエラーが発生しました: {e}")
         return 0
     return total
+
+# D-2.1 新
+def calculate_total_repaid_by_loan_id(repayments_file: str, loan_id: str) -> int:
+    """
+    D-2.1:
+    - payment_type が "REPAYMENT" の行だけを返済累計に含める
+    - 旧仕様（payment_type が無い/空）の行は REPAYMENT 扱いとして含める（後方互換）
+    """
+    total = 0
+
+    for row in _iter_repayments_rows(repayments_file) or []:
+        if (row.get("loan_id") or "") != loan_id:
+            continue
+
+        pt = (row.get("payment_type") or "").strip().upper()
+
+        # 後方互換：列が無い/空 → REPAYMENT扱い
+        if pt not in ("", "REPAYMENT"):
+            continue
+
+        try:
+            amt = int(float(row.get("repayment_amount") or 0))
+        except (ValueError, TypeError):
+            amt = 0
+
+        total += amt
+
+    return total
+
+
+def get_total_repaid_amount(repayments_file: str, loan_id: str) -> int:
+    """
+    Backward-compatible alias.
+    main.py や旧コードが参照するため残す。
+    """
+    return calculate_total_repaid_by_loan_id(repayments_file, loan_id)
+
+
+def calculate_total_late_fee_paid_by_loan_id(repayments_file: str, loan_id: str) -> int:
+    total = 0
+    for row in _iter_repayments_rows(repayments_file) or []:
+        if row["loan_id"] != loan_id:
+            continue
+        if row["payment_type"] != "LATE_FEE":
+            continue
+        try:
+            total += int(float(row["repayment_amount"]))
+        except Exception:
+            continue
+    return total
+        
 
 def get_repayment_expected(loan_id: str, loan_file: str = "loan_v3.csv") -> float:
     """指定 loan_id の予定返済額を CSV から取得（pandas不要）"""
@@ -1071,15 +1334,27 @@ def compute_recovery_amount(
     }
 
 
-def _normalize_repayments_headers(header_row: list[str]) -> list[str]:
-    mapping = {
-        "repayed_amount": "repayment_amount",
-        "repay_amount": "repayment_amount",
+def _normalize_repayments_headers(headers: list[str]) -> list[str]:
+    alias = {
+        # loan_id
         "loanid": "loan_id",
-        "date": "repayment_date",
+        "loan_id": "loan_id",
+
+        # customer_id
         "payer": "customer_id",
+        "customer": "customer_id",
+        "customer_id": "customer_id",
+
+        # repayment_amount
+        "repay_amount": "repayment_amount",
+        "repayed_amount": "repayment_amount",
+        "repayment_amount": "repayment_amount",
+
+        # repayment_date
+        "date": "repayment_date",
+        "repayment_date": "repayment_date",
     }
-    return [mapping.get(h.strip(), h.strip()) for h in header_row]
+    return [alias.get(h.strip().lower(), h.strip().lower()) for h in headers]
 
 
 # C-4 猶予付き延滞判定（effective_due）
@@ -1331,3 +1606,92 @@ def cancel_contract(loan_file: str, loan_id: str, *, reason: str = "", operator:
         actor=operator,
     )
     return True
+
+# D-2.1
+def _ensure_repayments_schema(repayments_file: str) -> None:
+    if (not os.path.exists(repayments_file)) or (os.stat(repayments_file).st_size == 0):
+        with open(repayments_file, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(REPAYMENTS_HEADER)
+        return
+
+    with open(repayments_file, "r", newline="", encoding="utf-8-sig") as f:
+        r = csv.reader(f)
+        header = next(r, None)
+    
+    if not header:
+        with open(repayments_file, "w", newline="", encoding="utf-8") as f:
+            w = csv.writer(f)
+            w.writerow(REPAYMENTS_HEADER)
+        return
+    
+    header_norm = [h.lstrip("\ufeff").strip().strip('"') for h in header]
+    header_norm = _normalize_repayments_headers(header_norm) 
+
+    if "payment_type" in header_norm:
+        return
+    
+    idx = {name: i for i, name in enumerate(header_norm)}
+
+    def _get(row, key, default=""):
+        i = idx.get(key)
+        if i is None or i >= len(row):
+            return default
+        return row[i]
+    
+    new_rows = []
+    with open(repayments_file, "r", newline="", encoding="utf-8-sig") as f:
+        r = csv.reader(f)
+        _ = next(r, None)
+        for row in r:
+            new_rows.append(
+                [
+                    _get(row, "loan_id"),
+                    _get(row, "customer_id"),
+                    _get(row, "repayment_amount"),
+                    _get(row, "repayment_date"),
+                    "REPAYMENT",
+                ]
+            )
+
+    with open(repayments_file, "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(REPAYMENTS_HEADER)
+        w.writerows(new_rows)
+
+# D-2.1
+def _iter_repayments_rows(repayments_file: str):
+    try:
+        with open(repayments_file, "r", newline="", encoding="utf-8-sig") as f:
+            r = csv.reader(f)
+            header = next(r, None)
+            if not header:
+                return
+            header = [h.lstrip("\ufeff").strip().strip('"') for h in header]
+            header = _normalize_repayments_headers(header)
+
+            idx = {name: i for i, name in enumerate(header)}
+
+            def getv(row, key, default=""):
+                i = idx.get(key)
+                if i is None or i >= len(row):
+                    return default
+                return row[i]
+            
+            has_type = "payment_type" in idx
+
+            for row in r:
+                loan_id = getv(row, "loan_id")
+                custoemer_id = getv(row, "customer_id")
+                payment_type = getv(row, "payment_type") if has_type else "REPAYMENT"
+                amt = getv(row, "repayment_amount")
+                rdate = getv(row, "repayment_date")
+                yield {
+                    "loan_id": loan_id,
+                    "customer_id": custoemer_id,
+                    "payment_type": (payment_type or "REPAYMENT").strip(),
+                    "repayment_amount": amt,
+                    "repayment_date": rdate,
+                }
+    except FileNotFoundError:
+        return        

@@ -3,6 +3,7 @@ from datetime import datetime, date
 import argparse
 import csv
 import os
+import sys
 from pathlib import Path
 
 # C-1（--summaryでも使う）
@@ -15,23 +16,49 @@ from modules.utils import (
     validate_schema,
 )
 
+def _count_csv_rows(path: Path) -> int:
+    """ヘッダー除く行数（ファイル無ければ0）"""
+    if not path.exists():
+        return 0
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        # 1行目ヘッダーを除外
+        n = -1
+        for _ in f:
+            n += 1
+        return max(0, n)
+
+def _quick_summary(argv: list[str]) -> bool:
+    if "--summary" not in argv:
+        return False
+
+    root = Path(__file__).resolve().parent
+    data_dir = root / "data"
+    loans = data_dir / "loan_v3.csv"
+    reps  = data_dir / "repayments.csv"
+
+    print(f"[summary] loans: {_count_csv_rows(loans)} | repayments: {_count_csv_rows(reps)}")
+    raise SystemExit(0)
+
+_quick_summary(sys.argv[1:])
+
+
 # --- C-7.5 非対話サマリ（軽量） ---
 
-def _show_summary_noninteractive():
-    """data配下CSVの件数だけを非対話で表示（理解日用の軽量サマリ）"""
-    paths = get_project_paths()
-    loans_p = Path(paths["loans_csv"])
-    reps_p  = Path(paths["repayments_csv"])
+#def _show_summary_noninteractive():
+    #"""data配下CSVの件数だけを非対話で表示（理解日用の軽量サマリ）"""
+    #paths = get_project_paths()
+    #loans_p = Path(paths["loans_csv"])
+    #reps_p  = Path(paths["repayments_csv"])
 
-    def _read_rows(p: Path):
-        if p.exists() and p.stat().st_size > 0:
-            with p.open("r", newline="", encoding="utf-8-sig") as f:
-                return list(csv.DictReader(f))
-        return []
+    #def _read_rows(p: Path):
+        #if p.exists() and p.stat().st_size > 0:
+            #with p.open("r", newline="", encoding="utf-8-sig") as f:
+                #return list(csv.DictReader(f))
+        #return []
 
-    loans = _read_rows(loans_p)
-    reps  = _read_rows(reps_p)
-    print(f"[summary] loans: {len(loans)} | repayments: {len(reps)}")
+    #loans = _read_rows(loans_p)
+    #reps  = _read_rows(reps_p)
+    #print(f"[summary] loans: {len(loans)} | repayments: {len(reps)}")
 
 # === ここから下の“重い import（ドメイン層）”は try でガード ===
 #    ※ --summary だけなら未存在でも問題なく動けるようにする
@@ -56,7 +83,6 @@ try:
         get_total_repaid_amount,
         get_loan_info_by_loan_id,
         is_over_repayment,
-        register_repayment_complete,
     )
 
     # 残高照会
@@ -69,7 +95,9 @@ try:
     # グローバル・ロガー （二重出力しないようモジュールレベルで生成）
     logger = get_logger("k_loan_ledger")
 
-except ModuleNotFoundError:
+except ModuleNotFoundError as e:
+    print(f"[ERROR] import 失敗: {e}")
+    raise
     # tests/test_seed_flow.py は最小構成のみをコピーするため、
     # --summary 実行時はこれらが無い想定。ダミーを用意しておく。
     def append_audit(*a, **k):
@@ -291,6 +319,8 @@ def loan_history_mode(loans_file):
     )
     display_loan_history(customer_id, filepath=loans_file)
 
+
+
 def repayment_registration_mode(loans_file, repayments_file):
     print("\n=== 返済記録モード (B-11 新実装）===")
 
@@ -328,8 +358,10 @@ def repayment_registration_mode(loans_file, repayments_file):
         "返済日を入力してください（YYYY-MM-DD、未入力で今日の日付）: "
     )
     
+    from modules.loan_module import register_repayment_complete
+
     # 追記
-    row = register_repayment_complete(
+    summary = register_repayment_complete(
         loans_file=loans_file,
         repayments_file=repayments_file,
         loan_id=loan_id,
@@ -338,11 +370,21 @@ def repayment_registration_mode(loans_file, repayments_file):
         actor="user",
     )
 
-    if not row:
+    if not summary:
+        print("❌ 返済登録に失敗しました（入力額超過/loan_id不正など）。")
         return
 
-    print(f"[INFO] repayments.csv に追記しました: {row}")
     print("✅ 返済記録の登録が完了しました。")
+    print(f"[INFO] 書込先: {summary.get('repayments_file')}")
+    print(
+        f"[INFO] 入力合計：¥{summary['input_total']:,} "
+        f"(REPAYMENT：¥{summary['repayment_part']:,} / LATE_FEE：¥{summary['late_fee_part']:,})"
+    )
+
+    # 実際に書いた行を全部表示
+    for r in summary["written_rows"]:
+        print(f"[INFO] 追記行: {r}")
+
 
 def cancel_contract_mode(loans_file):
     print("\n=== 契約解除登録(C-9) ===")

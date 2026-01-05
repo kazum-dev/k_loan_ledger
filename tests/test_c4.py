@@ -8,7 +8,10 @@ import types
 
 import pytest
 
-import loan_module as m
+import sys
+import modules.loan_module as m
+sys.modules["loan_module"] = m
+
 import modules.audit as audit
 
 
