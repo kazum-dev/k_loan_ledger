@@ -12,6 +12,9 @@ from modules.utils import (
 )
 from modules.logger import get_logger
 
+from modules.loan_module import get_unpaid_loans_rows, calculate_total_repaid_by_loan_id
+
+
 # --- C-6: balance側でも明示的にスキーマ検証してログに出す ---
 
 REQUIRED_LOANS = {
@@ -108,53 +111,50 @@ def _normalize_row(d: dict) -> dict:
 
 # --- 公開API ---
 
-def display_balance(customer_id: str, paths: Dict[str, Path] | None = None, clamp_negative: bool = False) -> None:
+def display_balance(customer_id: str, paths: Dict[str, Path] | None = None, today=None) -> None:
     """
     残高を表示する(メニュー5から利用)
-    - 引数paths省略時は get_project_paths() の data 配下を使用 (C-6要件)
-    - 事前にヘッダ補正＆スキーマ検証を行い、結果を data/app.log に INFO/WARN 出力
-    - 表示の金額は fmt_currency() で "¥#,###" 統一
+    - モード9/10と同じ判定軸（loan_idベース / CANCELLED除外 / REPAYMENTのみ）で残高を算出する
     """
     paths = paths or get_project_paths()
     logger = get_logger("k_loan_ledger")
 
     _preflight(paths, logger)
 
-    loans_file = Path(paths["loans_csv"])
-    reps_file = Path(paths["repayments_csv"])
+    loans_file = str(Path(paths["loans_csv"]))
+    reps_file  = str(Path(paths["repayments_csv"]))
 
-    # --- 集計：顧客別 期待値返済額 と 返済額 ---
-    loan_totals = defaultdict(int)
-    repay_totals = defaultdict(int)
+    unpaid_loans = get_unpaid_loans_rows(
+        customer_id,
+        loan_file=loans_file,
+        repayment_file=reps_file,
+        filter_mode="all",
+        today=today,
+    )
 
-    if loans_file.exists():
-        with loans_file.open("r", encoding="utf-8", newline="") as f:
-            for row in csv.DictReader(f):
-                row = _normalize_row(row)
-                if row.get("customer_id") != customer_id:
-                    continue
-                expected = _parse_money(row.get("repayment_expected") or row.get("loan_amount"))
-                loan_totals[customer_id] += expected
+    total_expected = 0
+    total_repaid = 0
+    total_remaining = 0
 
-    if reps_file.exists():
-        with reps_file.open("r", encoding="utf-8", newline="") as f:
-            for row in csv.DictReader(f):
-                row = _normalize_row(row)
-                if row.get("customer_id") != customer_id:
-                    continue
-                # 新: repayment_amount / 旧: amount の双方に対応
-                amount = _parse_money(row.get("repayment_amount") or row.get("amount"))
-                repay_totals[customer_id] += amount
+    for loan in unpaid_loans:
+        loan_id = loan.get("loan_id")
+        if not loan_id:
+            continue
 
-    excepted_total = loan_totals.get(customer_id, 0)
-    repaid_total = repay_totals.get(customer_id, 0)
-    balance = excepted_total -repaid_total
-    if clamp_negative:
-        balance = max(0, balance)
+        try:
+            expected = int(float(loan.get("repayment_expected") or 0))
+        except (ValueError, TypeError):
+            expected = 0
 
-    # --- 表示（フォーマット統一）---
+        repaid = calculate_total_repaid_by_loan_id(reps_file, loan_id)
+        remaining = max(0, expected - repaid)
+
+        total_expected += expected
+        total_repaid += repaid
+        total_remaining += remaining
+
     print("\n=== 残高照会モード ===")
     print(f"顧客ID：{customer_id}")
-    print(f"💰 貸付総額（予定返済額合計）：{fmt_currency(excepted_total)}")
-    print(f"💸 返済総額：{fmt_currency(repaid_total)}")
-    print(f"🧾 残高（未返済額）：{fmt_currency(balance)}")
+    print(f"💰 未返済分の予定返済額合計：{fmt_currency(total_expected)}")
+    print(f"💸 未返済分の返済済合計（REPAYMENT累計）：{fmt_currency(total_repaid)}")
+    print(f"🧾 残高（未返済額合計）：{fmt_currency(total_remaining)}")

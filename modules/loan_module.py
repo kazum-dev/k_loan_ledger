@@ -733,7 +733,7 @@ def register_repayment_complete(
     #      - 元本返済(REPAYMENT)行（repayment_part）
     #      - 延滞手数料(LATE_FEE)行（fee_part）
     #      それぞれ audit_log にも同内容を残す（監査性/説明責任）
-    
+
     written_rows = []
     with open(repayments_file, "a", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=REPAYMENTS_HEADER)
@@ -786,7 +786,7 @@ def register_repayment_complete(
                 actor=actor,
             )
 
-    # 9) 返り値は summary(dict) に統一
+    # 9) 呼び出し側（CLI）に「何が起きたか」を返すため summary を返却する
     return {
         "loan_id": loan_id,
         "customer_id": info.get("customer_id"),
@@ -1077,6 +1077,54 @@ def display_unpaid_loans(
     except Exception as e:
         print(f"❌ エラーが発生しました: {e}")
         return []
+
+# D-2.2   
+def get_unpaid_loans_rows(
+    customer_id: str,
+    loan_file: str,
+    repayment_file: str,
+    *,
+    filter_mode: str = "all",  # "all" / "overdue"
+    today=None,
+):
+    """
+    表示なしで「未返済loan行（loan_v3のrow）」だけ返す。
+    display_unpaid_loans() と同じ抽出条件（CANCELLED除外 / loan_idベース）で統一する。
+    """
+    _today = today or date.today()
+
+    with open(loan_file, newline="", encoding="utf-8") as lf:
+        loan_reader = csv.DictReader(lf)
+        loans = [row for row in loan_reader if row.get("customer_id") == customer_id]
+
+    # CANCELLED除外（回収対象外）
+    loans = [row for row in loans if row.get("contract_status", "ACTIVE") != "CANCELLED"]
+
+    unpaid = []
+    for loan in loans:
+        loan_id = loan.get("loan_id")
+        if not loan_id:
+            continue
+        if not is_loan_fully_repaid(loan_id, loan_file, repayment_file):
+            unpaid.append(loan)
+
+    if filter_mode == "overdue":
+        filtered = []
+        for ln in unpaid:
+            ds = ln.get("due_date", "")
+            if not ds:
+                continue
+            try:
+                grace_days = int(ln.get("grace_period_days", 0))
+            except ValueError:
+                grace_days = 0
+
+            if calc_overdue_days(_today, ds, grace_days) > 0:
+                filtered.append(ln)
+        unpaid = filtered
+
+    return unpaid
+
 
 # 延滞日数と延滞手数料を計算する関数
 def calculate_late_fee(
