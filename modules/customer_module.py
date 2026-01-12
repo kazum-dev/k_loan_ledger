@@ -4,7 +4,7 @@ import csv
 def create_customers_csv():
     with open("customers.csv", mode="w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
-        writer.writerow(["id", "name", "credit_limit"])
+        writer.writerow(["customer_id", "customer_name", "credit_limit"])
 
 
 def add_customer(name, credit_limit):

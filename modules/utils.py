@@ -110,6 +110,117 @@ def fmt_date(d: Union[str, date, datetime, None]) -> Optional[str]:
         return datetime.strptime(s2, "%Y-%m-%d").date().isoformat()
     except ValueError:
         return None
+    
+# ======================
+# 入力ヘルパー（D-3）
+# ======================
+
+def prompt_int(
+        prompt: str,
+        *,
+        min_value: int | None = None,
+        max_value: int | None = None,
+        default: int | None = None,
+) -> int:
+    while True:
+        raw = input(prompt).strip()
+        if raw == "" and default is not None:
+            return default
+        try:
+            n = int(raw)
+        except ValueError:
+            print("❌ 金額/日数は整数で入力してください。")
+            continue
+
+        if min_value is not None and n < min_value:
+            print(f"❌ {min_value}以上で入力してください。")
+            continue
+        if max_value is not None and n > max_value:
+            print(f"⚠ 上限({max_value})を超えています。別の値を入力してください。")
+            continue
+        return n
+    
+def prompt_float(
+        prompt: str,
+        *,
+        min_value: float | None = None,
+        max_value: float | None = None,
+        default: float | None = None,
+        round_to: int | None = None,
+) -> float:
+    while True:
+        raw = input(prompt).strip()
+        if raw == "" and default is not None:
+            val = float(default)
+            return round(val, round_to) if round_to is not None else val
+        
+        try:
+            x = float(raw)
+        except ValueError:
+            print("❌ 数値で入力してください。")
+            continue
+
+        if min_value is not None and x < min_value:
+            print(f"❌ {min_value}以上で入力してください。")
+            continue
+        if max_value is not None and x > max_value:
+            print(f"⚠ {max_value}以下で入力してください。")
+            continue
+
+        return round(x, round_to) if round_to is not None else x
+    
+def prompt_date_or_today(prompt: str, *, today: date | None = None) -> str:
+    """
+    - 空Enter: today (未指定なら今日) を YYYY-MM-DD で返す
+    - 入力あり: fmt_date で正規化し、存在日付チェックも通す
+    """
+    base = today or date.today()
+    while True:
+        s = input(prompt).strip()
+        if not s:
+            today_str = base.isoformat()
+            print(f"[INFO] 日付を本日に自動設定しました: {today_str}")
+            return today_str
+        
+        normalized = fmt_date(s)
+        if not normalized:
+            print("❌ 日付は YYYY-MM-DD 形式で入力してください（例：2025-05-05）。")
+            continue
+
+        try:
+            datetime.strptime(normalized, "%Y-%m-%d")
+        except ValueError:
+            print("❌ 存在しない日付です。正しい日付を入力してください。")
+            continue
+
+        return normalized
+    
+def prompt_customer_id(
+        prompt: str,
+        *,
+        valid_ids: Set[str] | None = None,
+) -> str:
+    while True:
+        raw = input(prompt).strip()
+        cust = normalize_customer_id(raw)
+
+        if cust == "CUST000":
+            print("❌ 顧客IDが不正です（数字を含めて入力してください）。")
+            continue
+
+        if valid_ids is not None and cust not in valid_ids:
+            print("❌ 顧客IDが存在しません。先に顧客登録を行ってください。")
+            continue
+
+        return cust
+    
+def prompt_method(prompt: str) -> str:
+    raw = input(prompt).strip()
+    method = normalize_method(raw)
+    if method == "UNKNOWN":
+        print("⚠ 返済方法が特定できないため UNKNOWN として登録します。")
+    return method
+        
 
 
 # =======================

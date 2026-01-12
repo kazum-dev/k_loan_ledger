@@ -13,7 +13,12 @@ from modules.utils import (
     fmt_date,
     get_project_paths,
     clean_header_if_quoted,
+    prompt_method,
     validate_schema,
+    prompt_int,
+    prompt_float,
+    prompt_date_or_today,
+    prompt_customer_id
 )
 
 def _count_csv_rows(path: Path) -> int:
@@ -131,25 +136,6 @@ def enter_mode(mode_name: str):
     logger.info(f"Enter mode: {mode_name}")
     append_audit("ENTER", "mode", mode_name, None)
 
-def _prompt_date_or_today(prompt: str) -> str:
-    """
-    日付入力用の共通ヘルパー。
-    - 空Enter: 今日の日付を YYYY-MM-DD で自動設定
-    - それ以外: fmt_date で "YYYY-MM-DD" に正規化。失敗したら再入力。
-    """
-    while True:
-        s = input(prompt).strip()
-        if not s:
-            today_str = datetime.today().strftime("%Y-%m-%d")
-            print(f"[INFO] 日付を本日に自動設定しました: {today_str}")
-            return today_str
-
-        normalized = fmt_date(s)
-        if not normalized:
-            print("❌ 日付は YYYY-MM-DD 形式で入力してください（例：2025-05-05）。")
-            continue
-        return normalized
-
 def loan_registration_mode(loans_file):
 
     # 顧客IDの存在を確認
@@ -162,138 +148,57 @@ def loan_registration_mode(loans_file):
 
     print("\n=== 貸付記録を登録 ===")
 
-    # 事前に有効な顧客ID一覧を取得しておく
+    # 事前に有効な顧客IDを取得しておく
     valid_ids = {normalize_customer_id(x) for x in get_all_customer_ids()}
+
+    # 👤 顧客ID入力（存在チェック付き）
+    customer_id = prompt_customer_id(
+        "👤顧客IDを入力してください(例：001またはCUST001): ",
+        valid_ids=valid_ids,
+    )
+
+    # 上限取得
+    credit_limit = get_credit_limit(customer_id)
+    if credit_limit is None:
+        print("❌ 顧客の上限金額を取得できません。処理を中断します。")
+        return
     
-    # 👤 顧客ID入力（存在チェック付きループ）
-    while True:
-        customer_id_input = input(
-            "👤顧客IDを入力してください(例：001またはCUST001): "
-        ).strip()
-        customer_id = normalize_customer_id(customer_id_input)
+    # 💰 貸付額（整数・1円以上・上限以内）
+    amount = prompt_int(
+        "💰 貸付金額を入力してください（例：10000）: ",
+        min_value=1,
+        max_value=credit_limit,
+    )
 
-        if customer_id not in valid_ids:
-            print("❌ 顧客IDが存在しません。先に顧客登録を行ってください。")
-            continue
-        break
+    # 📈 利率（デフォ10.0 / 0.1以上）
+    interest_rate = prompt_float(
+        "📈利率（％）を入力してください ※未入力時は10.0%: ",
+        min_value=0.1,
+        default=10.0,
+    )
 
-    # 💰 貸付額を入力・チェック（整数・1円以上・上限以内）
-    while True:
-        amount_input = input("💰貸付金額を入力してください（例：10000）: ").strip()
-        try:
-            amount = int(amount_input)
-        except ValueError:
-            print("❌金額は整数で入力してください。")
-            continue
+    # 📅 貸付日（未入力なら今日）
+    loan_date = prompt_date_or_today(
+        "📅貸付日を入力(例：2025-05-05)※未入力なら今日の日付になります: "
+    )
 
-        if amount <= 0:
-            print("❌ 金額は1円以上で入力してください。")
-            continue
+    # 💳 返済方法（標準化）
+    repayment_method = prompt_method("💳返済方法を入力してください（例：現金／振込）: ")
 
-        # 顧客の貸付上限金額を取得する
-        credit_limit = get_credit_limit(customer_id)
-        if credit_limit is None:
-            print("❌ 顧客の上限金額を取得できません。処理を中断します。")
-            return
-        
-        if amount > credit_limit:
-            print(
-                f"⚠ 上限金額({credit_limit}円) を超えています。別の金額を入力してください。"
-            )
-            continue
+    # 猶予日数（デフォ0 / 0以上）
+    grace_period_days = prompt_int(
+        "⏳延滞猶予日数（日数）を入力してください（例：5） ※未入力なら0日: ",
+        min_value=0,
+        default=0,
+    )
 
-        # ここまで来たらOK
-        break
-
-    # 📈 利率を入力（デフォルト 10.0%、 1%以上のみ許可）
-    while True:
-        interest_input = input("📈利率（％）を入力してください ※未入力時は10.0%: ")
-        if not interest_input:
-            interest_rate = 10.0
-            break
-        try:
-            interest_rate = float(interest_input)
-        except ValueError:
-            print("❌ 利率は数値で入力してください。")
-            continue
-
-        if interest_rate <= 0:
-            print("❌ 利率は1%以上で入力してください。")
-            continue
-        break
-
-    # 貸付日を入力（形式＋存在チェック付きで再入力ループ）
-    while True:
-        raw = input(
-            "📅貸付日を入力(例：2025-05-05)※未入力なら今日の日付になります: "
-        ).strip()
-
-        # 空なら今日
-        if raw == "":
-            loan_date = datetime.today().strftime("%Y-%m-%d")
-            print(f"[INFO] 貸付日は本日に自動設定しました: {loan_date}")
-            break
-
-        # まず fmt_date で "YYYY-MM-DD" に正規化（/ や . も許容）
-        normalized = fmt_date(raw)
-        if normalized is None:
-            print("❌ 日付の形式が不正です。YYYY-MM-DD 形式で入力してください。")
-            continue
-
-        # ここで「カレンダー的に存在するか」までチェックする
-        try:
-            datetime.strptime(normalized, "%Y-%m-%d")
-        except ValueError:
-            print("❌ 存在しない日付です。正しい日付を入力してください。")
-            continue
-
-        loan_date = normalized
-        break
-
-
-    # 💳 返済方法を入力（normalize_method のまま使用） 
-    repayment_method = input("💳返済方法を入力してください（例：現金／振込）: ").strip()
-    repayment_method = normalize_method(repayment_method) # "CASH" 等に標準化
-    if repayment_method == "UNKNOWN":
-        print("⚠ 返済方法が特定できないため UNKNOWN として登録します。")
-
-    # ⏳ 延滞猶予日数を入力（整数・0以上）
-    while True:
-        grace_input = input(
-            "⏳延滞予定日数（日数）を入力してください（例：5）※未入力なら0日: "
-        ).strip()
-        if not grace_input:
-            grace_period_days = 0
-            break
-        try:
-            grace_period_days = int(grace_input)
-        except ValueError:
-            print("❌ 猶予日数は整数で入力してください。")
-            continue
-
-        if grace_period_days < 0:
-            print("❌ 猶予日数は0以上で入力してください。")
-            continue
-        break
-
-    # 🔢 延滞利率の入力（デフォルト 10.0%、0以上の数値）
-    while True:
-        late_fee_input = input(
-            "🔢 延滞利率 (%) を入力してください（例：10.0）※未入力で10.0: "
-        ).strip()
-        if not late_fee_input:
-            late_fee_rate_percent = 10.0
-            break
-        try:
-            late_fee_rate_percent = round(float(late_fee_input), 1)
-        except ValueError:
-            print("❌ 延滞利率は数値で入力してください。")
-            continue
-
-        if late_fee_rate_percent < 0:
-            print("❌ 延滞利率は0以上で入力してください。")
-            continue
-        break
+    # 🔢 延滞利率（デフォ10.0 / 0以上 / 小数1桁丸め）
+    late_fee_rate_percent = prompt_float(
+        "🔢 延滞利率（％）を入力してください（例：10.0）※未入力で10.0: ",
+        min_value=0.0,
+        default=10.0,
+        round_to=1,
+    )
 
     # C-12: 備考入力フック
     notes = input("📝 その他条件/備考があれば入力（未入力でスキップ）: ").strip()
@@ -345,16 +250,9 @@ def repayment_registration_mode(loans_file, repayments_file):
         loan_id = first
 
     # 返済金額入力
-    while True:
-        repayment_amount = input("返済金額を入力してください（整数）: ").strip()
-        if repayment_amount.isdigit() and int(repayment_amount) > 0:
-            repayment_amount = int(repayment_amount)
-            break
-        else:
-            print("[ERROR] 数字かつ1円以上を入力してください。")
+    repayment_amount = prompt_int("返済金額を入力してください（整数）: ", min_value=1)
 
-    # 返済日入力（フォーマット検証＋空Enterで今日）
-    repayment_date = _prompt_date_or_today(
+    repayment_date = prompt_date_or_today(
         "返済日を入力してください（YYYY-MM-DD、未入力で今日の日付）: "
     )
     
@@ -518,31 +416,19 @@ def main():
             elif choice == "4":
                 enter_mode("repayment_history")
                 print("\n=== 返済履歴表示モード ===")
-                customer_id = normalize_customer_id(
-                    input(
-                        "👤 顧客IDを入力してください（例：CUST001 または 001）: "
-                    ).strip()
-                )
+                customer_id = prompt_customer_id("👤 顧客IDを入力してください（例：CUST001 または 001）: ")
                 display_repayment_history(customer_id, filepath=repayments_file)
 
             elif choice == "5":
                 enter_mode("balance_inquiry")
                 print("\n=== 残高照会モード ===")
-                customer_id = normalize_customer_id(
-                    input(
-                        "👤 顧客IDを入力してください（例：CUST001 または 001）: "
-                    ).strip()
-                )
+                customer_id = prompt_customer_id("👤 顧客IDを入力してください（例：CUST001 または 001）: ")
                 display_balance(customer_id)
 
             elif choice == "9":
                 enter_mode("unpaid_summary")
                 print("\n=== 未返済貸付一覧＋サマリー ===")
-                customer_id = normalize_customer_id(
-                    input(
-                        "👤 顧客IDを入力してください（例：CUST001　または 001）: "
-                    ).strip()
-                )
+                customer_id = prompt_customer_id("👤 顧客IDを入力してください（例：CUST001 または 001）: ")
                 display_unpaid_loans(
                     customer_id,
                     filter_mode="all",
@@ -554,11 +440,7 @@ def main():
             elif choice == "10":
                 enter_mode("overdue_loans")
                 print("\n=== 延滞貸付一覧表示モード ===")
-                customer_id = normalize_customer_id(
-                    input(
-                        "👤 顧客IDを入力してください（例：CUST001 または 001）: "
-                    ).strip()
-                )
+                customer_id = prompt_customer_id("👤 顧客IDを入力してください（例：CUST001 または 001）: ")
                 display_unpaid_loans(
                     customer_id,
                     filter_mode="overdue",
