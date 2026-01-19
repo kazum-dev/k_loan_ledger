@@ -110,8 +110,7 @@ def _normalize_row(d: dict) -> dict:
     return {n(k): n(v) for k, v in (d or {}).items()}
 
 # --- 公開API ---
-
-def display_balance(customer_id: str, paths: Dict[str, Path] | None = None, today=None) -> None:
+def display_balance(customer_id: str,paths: Dict[str, Path] | None = None,today=None,clamp_negative: bool = True,) -> None:
     """
     残高を表示する(メニュー5から利用)
     - モード9/10と同じ判定軸（loan_idベース / CANCELLED除外 / REPAYMENTのみ）で残高を算出する
@@ -147,7 +146,8 @@ def display_balance(customer_id: str, paths: Dict[str, Path] | None = None, toda
             expected = 0
 
         repaid = calculate_total_repaid_by_loan_id(reps_file, loan_id)
-        remaining = max(0, expected - repaid)
+        raw_remaining = expected - repaid       
+        remaining = max(0, raw_remaining) if clamp_negative else raw_remaining
 
         total_expected += expected
         total_repaid += repaid

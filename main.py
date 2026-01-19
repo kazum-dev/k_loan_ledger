@@ -128,7 +128,6 @@ def _parse_today_arg(s: str | None) -> date:
 def _parse_cli_args():
     p = argparse.ArgumentParser()
     p.add_argument("--today", type=str, help="YYYY-MM-DD（指定がなければ今日）")
-    p.add_argument("--summary", action="store_true", help="CSV件数のサマリのみ表示して終了（非対話）")
     return p.parse_args()
 
 # 共通関数：モード突入時の技術ログ + 監査ログをセットで残す
@@ -313,28 +312,7 @@ def cancel_contract_mode(loans_file):
 def main():
     # C-7.5
     args = _parse_cli_args()
-    if getattr(args, "summary", False):
-        # ルート解決・CSV健全化は main() 本体の責務に乗る前に軽く実行
-        paths = get_project_paths()
-        # BOM/引用符の自動クレンジング（必要なら）
-        clean_header_if_quoted(paths["loans_csv"])
-        clean_header_if_quoted(paths["repayments_csv"])
-        # 最低限のスキーマ確認（WARNのみ）
-        validate_schema(paths["loans_csv"], {
-            "loan_id","customer_id","loan_amount","loan_date","due_date",
-            "interest_rate_percent","repayment_expected","repayment_method",
-            "grace_period_days","late_fee_rate_percent","late_base_amount",
-            # C-9
-            "contract_status","cancelled_at","cancel_reason",
-            # C-12
-            "notes",
-        })
-        validate_schema(paths["repayments_csv"], {
-            "loan_id","customer_id","repayment_amount","repayment_date",
-        })
-        _show_summary_noninteractive()
-        return
-    
+
     today_override = _parse_today_arg(args.today)
     paths = get_project_paths()
     loans_file = str(paths["loans_csv"])
@@ -401,6 +379,7 @@ def main():
 
             choice = input("モードを選択してください: ").strip()
             logger.info(f"Menu selected: {choice}")
+
             if choice == "1":
                 enter_mode("loan_registration")
                 loan_registration_mode(loans_file)
@@ -453,7 +432,6 @@ def main():
                 enter_mode("cancel_contract")
                 cancel_contract_mode(loans_file)
 
-
             elif choice == "0":
                 print("終了します。")
                 append_audit("END", "app", "session", {"status": "OK"}, actor="CLI")
@@ -462,10 +440,12 @@ def main():
 
             else:
                 print("❌ 無効な選択肢です。もう一度入力してください。")
+
     except Exception as e:
         logger.error(f"Unhandled error: {e}", exc_info=True)
         append_audit("ERROR", "app", "session", {"error": str(e)}, actor="CLI")
         raise
+
 
 
 if __name__ == "__main__":

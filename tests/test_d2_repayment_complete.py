@@ -123,3 +123,34 @@ def test_overpayment_blocked(tmp_path):
         actor="TEST",
     )
     assert row is None
+
+def test_d21_exact_remaining_allowed(tmp_path):
+    from modules.loan_module import register_repayment_complete
+
+    loans = tmp_path / "loan_v3.csv"
+    reps  = tmp_path / "repayments.csv"
+
+    loans.write_text(
+        "loan_id,customer_id,loan_amount,loan_date,due_date,"
+        "interest_rate_percent,repayment_expected,repayment_method,"
+        "grace_period_days,late_fee_rate_percent,late_base_amount,contract_status\n"
+        "L1,C001,10000,2025-01-01,2025-01-10,100,20000,CASH,0,10,10000,ACTIVE\n",
+        encoding="utf-8"
+    )
+
+    reps.write_text(
+        "loan_id,customer_id,repayment_amount,repayment_date,payment_type\n"
+        "L1,C001,15000,2025-01-05,REPAYMENT\n",
+        encoding="utf-8"
+    )
+
+    result = register_repayment_complete(
+        loans_file=str(loans),
+        repayments_file=str(reps),
+        loan_id="L1",
+        amount=5000,   # 残りちょうど
+        repayment_date="2025-01-20",
+    )
+
+    assert result is not None
+    assert result["repayment_part"] == 5000
