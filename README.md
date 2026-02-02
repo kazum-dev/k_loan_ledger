@@ -69,7 +69,7 @@ python main.py
 
 ## Design Policy
 
-## 1. Design Philosophy（設計思想）
+### 1. Design Philosophy（設計思想）
 
 `k_loan_ledger` は、貸付・返済・残高・監査（証跡）という業務ドメインを **CLI + CSV** で再現した小規模システムです。
 
@@ -96,7 +96,7 @@ python main.py
 - `audit.py`：監査ログ（証跡）。操作（mode遷移/起動終了/エラー等）を `data/audit_log.csv` に記録
 
 
-## 2. Public API（main.py が依存する “窓口”）
+### 2. Public API（main.py が依存する “窓口”）
 
 > ルール：`main.py` から呼ばれている関数は、CLIの安定動作を支える **公開契約（Public API）** として扱います。  
 > Docstring はまずこの範囲を優先して整備します。
@@ -130,7 +130,7 @@ python main.py
 - `prompt_customer_id()`, `prompt_method()`, `prompt_int()`, `prompt_float()`, `prompt_date_or_today()`
 
 
-## 3. Module Responsibilities（モジュール責務定義）
+### 3. Module Responsibilities（モジュール責務定義）
 
 > モジュールは「何をするか」ではなく  
 > **“何に責任を持ち、何をやらないか”** を明確にします。
@@ -161,7 +161,7 @@ python main.py
 **出力先**：`data/audit_log.csv`
 
 
-## 4. Naming Conventions（命名規則）
+### 4. Naming Conventions（命名規則）
 
 - PEP8 に準拠（snake_case / CapWords）
 - 関数は **動詞 + 目的語**（例：`register_loan`, `display_unpaid_loans`, `cancel_contract`）
@@ -169,7 +169,7 @@ python main.py
 - `*_file` / `*_path` は型と意味を一致させる（文字列パスか `Path` かを揃える）
 
 
-## 5. Docstring & Comment Policy（Docstring / コメント方針）
+### 5. Docstring & Comment Policy（Docstring / コメント方針）
 
 ### Docstring の目的
 - **API契約（入力・出力・例外・副作用）を明文化**し、CLIからの呼び出しを安定させる
@@ -525,7 +525,7 @@ pip install pytest → pip freeze > requirements.txt で生成できます。
 
 &nbsp; data/
 
-&nbsp;   loans_v3.csv
+&nbsp;   loan_v3.csv
 
 &nbsp;   repayments.csv
 
