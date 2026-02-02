@@ -67,7 +67,7 @@ python main.py
 
 ---
 
-# Design Policy
+## Design Policy
 
 ## 1. Design Philosophy（設計思想）
 
@@ -200,6 +200,7 @@ def display_unpaid_loans(customer_id: str, filter_mode: str, loan_file: str, rep
 
     Raises:
         ValueError: For invalid inputs (document actual behavior).
+    """
 ```
 
 ---
@@ -279,7 +280,7 @@ backup/
 - 「いつ・何をしたか」を中心に記録する
 
 **出力先**
-- `logs/app.log`（追記形式）
+- `data/app.log`（追記形式）
 
 **記録内容**
 - 実行日時（ISO形式）
@@ -524,7 +525,7 @@ pip install pytest → pip freeze > requirements.txt で生成できます。
 
 &nbsp; data/
 
-&nbsp;   loans.csv
+&nbsp;   loans_v3.csv
 
 &nbsp;   repayments.csv
 
