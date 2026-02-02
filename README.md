@@ -67,22 +67,140 @@ python main.py
 
 ---
 
-## 設計思想・特徴
+# Design Policy
 
-- **監査性**  
-  貸付・返済・契約状態を履歴として保持し、後から追跡可能
+## 1. Design Philosophy（設計思想）
 
-- **状態管理**  
-  契約中・完済・解除などを明示的に管理
+`k_loan_ledger` は、貸付・返済・残高・監査（証跡）という業務ドメインを **CLI + CSV** で再現した小規模システムです。
 
-- **業務ロジックの分離**  
-  入力 / 処理 / 表示を分離し、将来の UI 変更に耐える構造
+クラウドソーシング案件応募向けポートフォリオとして、以下を優先して設計しています。
 
-- **テスト前提の実装**  
-  pytest によるロジック検証を実施
+- **拡張性**：DB化・Web化（Flask等）への移行を見据え、責務と境界を固定する
+- **実務っぽさ**：起動時健全化（データ修復/検証）、ログ/監査の分離、操作証跡を残す設計を含める
 
-- **段階的拡張を前提とした構成**  
-  CLI → Web → Deploy への進化を想定
+### 境界（責務分離）
+
+- `main.py`：CLI の I/O とフロー制御（メニュー、入力、表示、例外ハンドリング）
+- `modules/`：業務ルールと判断（ドメインロジック）
+- `data/`：永続化ストレージ（CSV）
+- CSV の読み書き・パス解決・入力補助は `utils.py` に集約し、他モジュールの依存を減らす
+
+### 起動パスの分離（軽量サマリ）
+
+`--summary` 実行は「重い import を避けて」最小依存で動作します（CSV行数のみ表示）。  
+通常起動では domain 層（modules）を読み込み、各モード機能を提供します。
+
+### ログと監査の二層化
+
+- `logger.py`：技術者向け実行ログ（デバッグ/障害解析）。`data/app.log` に INFO/ERROR を出力
+- `audit.py`：監査ログ（証跡）。操作（mode遷移/起動終了/エラー等）を `data/audit_log.csv` に記録
+
+
+## 2. Public API（main.py が依存する “窓口”）
+
+> ルール：`main.py` から呼ばれている関数は、CLIの安定動作を支える **公開契約（Public API）** として扱います。  
+> Docstring はまずこの範囲を優先して整備します。
+
+### modules/customer_module.py
+- `list_customers()`
+- `search_customer(keyword)`
+- `get_all_customer_ids()`
+- `get_credit_limit(customer_id)`
+
+### modules/loan_module.py
+- `register_loan(...)`
+- `display_loan_history(customer_id, filepath=...)`
+- `display_repayment_history(customer_id, filepath=...)`
+- `display_unpaid_loans(customer_id, filter_mode, loan_file, repayment_file, today)`
+- `register_repayment_complete(loans_file, repayments_file, loan_id, amount, repayment_date, actor)`
+- `cancel_contract(loans_file, loan_id, reason, operator)`
+
+### modules/balance_module.py
+- `display_balance(customer_id)`
+
+### modules/logger.py / modules/audit.py
+- `get_logger(name)`
+- `append_audit(action, target_type, target_id, meta, actor=...)`
+
+### modules/utils.py（横断基盤：main が直接利用）
+- `get_project_paths()`
+- `clean_header_if_quoted(path)`
+- `validate_schema(path, required_columns)`
+- `normalize_customer_id()`, `normalize_method()`, `fmt_date()`
+- `prompt_customer_id()`, `prompt_method()`, `prompt_int()`, `prompt_float()`, `prompt_date_or_today()`
+
+
+## 3. Module Responsibilities（モジュール責務定義）
+
+> モジュールは「何をするか」ではなく  
+> **“何に責任を持ち、何をやらないか”** を明確にします。
+
+### `modules/loan_module.py`（中核ドメイン）
+**責務**：貸付・返済・未返済/延滞・契約状態など、貸付ドメインの判断を担う。  
+**やること**：登録/保存、履歴取得、未返済/延滞判定、契約解除などの業務ロジック  
+**やらないこと**：CLI入出力、パス解決、ログ設定
+
+### `modules/customer_module.py`（顧客マスタ）
+**責務**：`customers.csv` を扱う（参照・検索・上限取得など）。  
+**やらないこと**：残高計算、延滞判定（他責務）
+
+### `modules/balance_module.py`（照会）
+**責務**：貸付・返済を突合し、顧客単位の残高を算出する。  
+**やらないこと**：貸付/返済の登録処理
+
+### `modules/utils.py`（共通基盤）
+**責務**：CSV I/O、パス、入力補助、正規化、スキーマ検証など横断処理。  
+**やらないこと**：ドメイン固有の判断（延滞/残高など）
+
+### `modules/logger.py`（技術ログ）
+**責務**：実行ログ（開発・運用向け）を出力する。  
+**出力先**：`data/app.log`
+
+### `modules/audit.py`（監査ログ）
+**責務**：業務操作の証跡を記録し、後追い検証・集計可能にする。  
+**出力先**：`data/audit_log.csv`
+
+
+## 4. Naming Conventions（命名規則）
+
+- PEP8 に準拠（snake_case / CapWords）
+- 関数は **動詞 + 目的語**（例：`register_loan`, `display_unpaid_loans`, `cancel_contract`）
+- 金額/日数など **単位を含める**（例：`late_fee_rate_percent`, `grace_period_days`）
+- `*_file` / `*_path` は型と意味を一致させる（文字列パスか `Path` かを揃える）
+
+
+## 5. Docstring & Comment Policy（Docstring / コメント方針）
+
+### Docstring の目的
+- **API契約（入力・出力・例外・副作用）を明文化**し、CLIからの呼び出しを安定させる
+- 将来の UI/保存先変更（CSV→DB）で破壊的変更を避ける
+
+### Docstring を必須にする対象
+**main.py から直接呼ばれる “Public API” は必須**（上の一覧）。  
+内部ヘルパーは複雑な場合のみ記述します。
+
+### コメントの目的
+- コメントは **Why（なぜ）** を書く
+- What（何をしているか）はコードで表現する
+
+### Docstring テンプレ（簡易 Google style）
+```python
+def display_unpaid_loans(customer_id: str, filter_mode: str, loan_file: str, repayment_file: str, today: date):
+    """Show unpaid loans for a customer.
+
+    Args:
+        customer_id: Normalized customer identifier.
+        filter_mode: "all" or "overdue".
+        loan_file: Path to loan CSV.
+        repayment_file: Path to repayment CSV.
+        today: Reference date used for overdue judgment.
+
+    Returns:
+        list[dict] | None: Depends on implementation (document actual behavior).
+
+    Raises:
+        ValueError: For invalid inputs (document actual behavior).
+```
 
 ---
 
