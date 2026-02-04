@@ -11,6 +11,107 @@ K’s Loan Ledger は、Excel やスプレッドシートで属人化しがち�
 
 ---
 
+## 全体構造（1分で把握）
+
+本ツールは **CSVを正データ（Single Source of Truth）** とし、  
+CLI（main.py）からドメインロジック（modules）を経由して  
+**履歴・状態・集計を一貫して管理**する構造を採用しています。
+
+---
+
+### CSV関係図（正データ構造）
+
+```mermaid
+erDiagram
+  CUSTOMERS ||--o{ LOANS : has
+  LOANS ||--o{ REPAYMENTS : has
+  LOANS ||--o{ AUDIT_LOG : generates
+
+  CUSTOMERS {
+    string customer_id PK
+    string customer_name
+    int credit_limit
+  }
+
+  LOANS {
+    string loan_id PK
+    string customer_id FK
+    int loan_amount
+    date loan_date
+    date due_date
+    float interest_rate_percent
+    int repayment_expected
+    string repayment_method
+    int grace_period_days
+    float late_fee_rate_percent
+    int late_base_amount
+    string contract_status
+    date cancelled_at
+    string cancel_reason
+    string notes
+  }
+
+  REPAYMENTS {
+    string loan_id FK
+    string customer_id
+    int repayment_amount
+    date repayment_date
+    string payment_type
+  }
+
+  AUDIT_LOG {
+    datetime ts
+    string event
+    string loan_id
+    int amount
+    string meta
+    string actor
+  }
+```
+
+### データフロー（CLI → modules → CSV → 集計/表示）
+```mermaid
+flowchart LR
+  USER[User] --> CLI[main.py<br/>CLI I/O & Flow Control]
+
+  CLI --> LOAN[loan_module]
+  CLI --> BAL[balance_module]
+  CLI --> CUST[customer_module]
+  CLI --> AUD[audit]
+
+  LOAN --> LOANS_CSV[(loan_v3.csv)]
+  LOAN --> REPAY_CSV[(repayments.csv)]
+  CUST --> CUST_CSV[(customers.csv)]
+  AUD --> AUDIT_CSV[(audit_log.csv)]
+
+  LOANS_CSV --> BAL
+  REPAY_CSV --> BAL
+
+  BAL --> OUT[残高 / 未返済 / 延滞表示]
+```
+
+### ユースケース（業務フロー例）
+```text
+[1] 貸付登録（CLI: モード1）
+  - loan_v3.csv に契約情報を追記
+  - loan_id を主キーとして発行
+  - audit_log.csv に操作履歴を記録
+
+[2] 返済登録（CLI: モード3）
+  - repayments.csv に返済履歴を追記（分割返済可）
+  - loan_id / customer_id の参照整合性を検証
+
+[3] 未返済・延滞判定（CLI: モード9 / 10）
+  - due_date + grace_period_days を基準に状態判定
+  - 延滞時は late_fee_rate_percent に基づき手数料算出
+
+[4] 残高・回収額表示（CLI: モード5）
+  - 予定返済額 − 返済累計 ± 延滞手数料
+  - 顧客単位・貸付単位で説明可能な形で表示
+```
+
+---
+
 ## プロダクト背景
 
 小規模事業やチーム内では、以下のような金銭管理が日常的に発生します。
