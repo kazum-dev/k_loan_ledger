@@ -46,27 +46,6 @@ def _quick_summary(argv: list[str]) -> bool:
 
 _quick_summary(sys.argv[1:])
 
-
-# --- C-7.5 非対話サマリ（軽量） ---
-
-#def _show_summary_noninteractive():
-    #"""data配下CSVの件数だけを非対話で表示（理解日用の軽量サマリ）"""
-    #paths = get_project_paths()
-    #loans_p = Path(paths["loans_csv"])
-    #reps_p  = Path(paths["repayments_csv"])
-
-    #def _read_rows(p: Path):
-        #if p.exists() and p.stat().st_size > 0:
-            #with p.open("r", newline="", encoding="utf-8-sig") as f:
-                #return list(csv.DictReader(f))
-        #return []
-
-    #loans = _read_rows(loans_p)
-    #reps  = _read_rows(reps_p)
-    #print(f"[summary] loans: {len(loans)} | repayments: {len(reps)}")
-
-# === ここから下の“重い import（ドメイン層）”は try でガード ===
-#    ※ --summary だけなら未存在でも問題なく動けるようにする
 try:
     # 顧客情報関連
     from modules.customer_module import (
@@ -101,7 +80,8 @@ try:
     logger = get_logger("k_loan_ledger")
 
 except ModuleNotFoundError as e:
-    print(f"[ERROR] import 失敗: {e}")
+    #print(f"[ERROR] import 失敗: {e}")
+    print(f"❌ ERROR: importに失敗しました: {e}。")
     raise
     # tests/test_seed_flow.py は最小構成のみをコピーするため、
     # --summary 実行時はこれらが無い想定。ダミーを用意しておく。
@@ -122,7 +102,7 @@ def _parse_today_arg(s: str | None) -> date:
     try:
         return datetime.strptime(s, "%Y-%m-%d").date()
     except ValueError:
-        raise SystemExit(f"[ERROR] --today は YYYY-MM-DD 形式で指定してください: {s!r}")
+        raise SystemExit(f"❌ ERROR: --todayはYYYY-MM-DD形式で指定してください: {s!r}。")
 
 # === 2) 既存の _parse_cli_args を置き換え === C-7.5
 def _parse_cli_args():
@@ -159,7 +139,7 @@ def loan_registration_mode(loans_file):
     # 上限取得
     credit_limit = get_credit_limit(customer_id)
     if credit_limit is None:
-        print("❌ 顧客の上限金額を取得できません。処理を中断します。")
+        print("❌ ERROR: 顧客の上限金額を取得できません。処理を中断します。")
         return
     
     # 💰 貸付額（整数・1円以上・上限以内）
@@ -243,7 +223,7 @@ def repayment_registration_mode(loans_file, repayments_file):
                 today=date.today(),
             )
         except Exception as _e:
-            print(f"[WARN] 未返済候補の表示で警告: {_e}")
+            print(f"⚠️ WARN: 未返済候補の表示に失敗しました: {_e}。")
         loan_id = input("上の一覧から登録する loan_id を入力してください: ").strip()
     else:
         loan_id = first
@@ -268,27 +248,24 @@ def repayment_registration_mode(loans_file, repayments_file):
     )
 
     if not summary:
-        print("❌ 返済登録に失敗しました（入力額超過/loan_id不正など）。")
+        print("❌ ERROR: 返済登録に失敗しました（入力額超過/loan_id不正など）。")
         return
 
-    print("✅ 返済記録の登録が完了しました。")
-    print(f"[INFO] 書込先: {summary.get('repayments_file')}")
-    print(
-        f"[INFO] 入力合計：¥{summary['input_total']:,} "
-        f"(REPAYMENT：¥{summary['repayment_part']:,} / LATE_FEE：¥{summary['late_fee_part']:,})"
-    )
+    print("✅ SUCCESS: 返済記録の登録が完了しました。")
+    print(f"✅ SUCCESS: 書込先: {summary.get('repayments_file')}。")
+    print(f"✅ SUCCESS: 入力合計: ¥{summary['input_total']:,} "f"(REPAYMENT: ¥{summary['repayment_part']:,} / LATE_FEE: ¥{summary['late_fee_part']:,})。")
 
     # 実際に書いた行を全部表示
     for r in summary["written_rows"]:
-        print(f"[INFO] 追記行: {r}")
-
+        print(f"✅ SUCCESS: 追記行: {r}。")
 
 def cancel_contract_mode(loans_file):
     print("\n=== 契約解除登録(C-9) ===")
     loan_id = input("契約解除する loan_id を入力してください: ").strip()
     info = get_loan_info_by_loan_id(loans_file, loan_id)
+    if not loan_id: print("❌ ERROR: loan_idを入力してください。"); return
     if not info:
-        print(f"[ERROR] loan_id {loan_id} が見つかりません。")
+        print(f"❌ ERROR: 指定されたloan_idは見つかりません: {loan_id}。")
         return
 
     # 事前プレビュー
@@ -302,7 +279,7 @@ def cancel_contract_mode(loans_file):
     reason = input("解除理由（空でも可）: ").strip()
     ok = input("この内容で契約解除しますか？ (y/N): ").strip().lower()
     if ok != "y":
-        print("[INFO] キャンセルしました。")
+        print("⚠️ WARN: キャンセルしました。")
         return
 
     from modules.loan_module import cancel_contract
@@ -433,70 +410,18 @@ def main():
                 cancel_contract_mode(loans_file)
 
             elif choice == "0":
-                print("終了します。")
+                print("✅ SUCCESS: 終了します。")
                 append_audit("END", "app", "session", {"status": "OK"}, actor="CLI")
                 logger.info("App shutdown (user exit)")
                 break
 
             else:
-                print("❌ 無効な選択肢です。もう一度入力してください。")
+                print("❌ ERROR: 無効な選択肢です。もう一度入力してください。")
 
     except Exception as e:
         logger.error(f"Unhandled error: {e}", exc_info=True)
         append_audit("ERROR", "app", "session", {"error": str(e)}, actor="CLI")
         raise
 
-
-
 if __name__ == "__main__":
-    # --- C-0 quick test (一時追加したら終わったら消してOK) ---
-    # from datetime import date
-    # from modules.loan_module import display_unpaid_loans
-
-    # test_customer = "CUST003"
-
-    # print("\n[TEST-1] 閾値ちょうど（延滞にならない想定）")
-    # display_unpaid_loans(
-    # customer_id=test_customer,
-    # loan_file=loans_file,
-    # repayment_file="repayments.csv",
-    # filter_mode="overdue",
-    # today=date(2025, 8, 15)   # due 8/10 + 猶予5日 → 閾値 8/15
-    # )
-
-    # print("\n[TEST-2] 閾値+1日（延滞になる想定）")
-    # display_unpaid_loans(
-    # customer_id=test_customer,
-    # loan_file=loans_file,
-    # repayment_file="repayments.csv",
-    # filter_mode="overdue",
-    # today=date(2025, 8, 16)   # 閾値を1日超える
-    # )
-
     main()
-# ---テスト用（C-0）
-# from datetime import date
-# from modules.loan_module import display_unpaid_loans
-
-# テスト用の顧客ID
-# test_customer = "CUST003"
-
-# print("=== C-0 動作確認テスト ===")
-# display_unpaid_loans(
-# customer_id=test_customer,
-# loan_file="loan_v3.csv",
-# repayment_file="repayments.csv",
-# filter_mode="overdue",
-# today=date(2025, 8, 27)
-# )
-
-# --- テスト用（B-13）---
-# loan_id = "L20250723-001"
-# result = is_loan_fully_repaid(loan_id)
-# print(f"[判定結果] Loan {loan_id} fully repaid? → {result}")
-
-
-# --- テスト用（B-12）---
-#    test_loan_id = "L20250721-001"
-#    result = calculate_total_repaid_by_loan_id("repayments.csv", test_loan_id)
-#    print(f"📊 Loan ID {test_loan_id} の累計返済額は：{result:,}円")

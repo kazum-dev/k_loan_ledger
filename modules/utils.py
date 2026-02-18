@@ -179,7 +179,7 @@ def prompt_date_or_today(prompt: str, *, today: date | None = None) -> str:
         s = input(prompt).strip()
         if not s:
             today_str = base.isoformat()
-            print(f"[INFO] 日付を本日に自動設定しました: {today_str}")
+            print(f"⚠️ WARN: 日付を本日に自動設定しました: {today_str}")
             return today_str
         
         normalized = fmt_date(s)

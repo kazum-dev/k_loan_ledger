@@ -220,7 +220,8 @@ def register_loan(
             )
 
         # 保存成功メッセージ
-        print("✅貸付記録が保存されました。")
+        #print("✅貸付記録が保存されました。")
+        print("✅ SUCCESS: 貸付記録を保存しました。")
 
         # ★C-4 監査フック（成功時のみ）
         try:
@@ -242,10 +243,10 @@ def register_loan(
                 actor="CLI",
             )
         except Exception as _e:
-            print(f"[WARN] audit で警告: {_e}")
+            print(f"⚠️ WARN: 監査ログの記録に失敗しました: {_e}。")
     
-    except Exception as e:
-        print(f"❌ エラーが発生しました: {e}")
+    except Exception as e:        
+        print(f"❌ ERROR: 処理に失敗しました: {e}。")
 
 
 # 顧客IDごとの貸付履歴を表示する関数
@@ -289,15 +290,12 @@ def display_loan_history(customer_id, filepath):
 
 
         else:
-            # 該当履歴がなかった場合のメッセージ
-            print("該当する貸付履歴はありません。")
+            print("✅ SUCCESS: 該当する貸付履歴はありません。")
 
     except FileNotFoundError:
-        # ファイルが存在しない場合のエラーメッセージ
-        print("エラー：ファイルが見つかりません。ファイルパスを確認してください。")
+        print("❌ ERROR: ファイルが見つかりません。ファイルパスを確認してください。")
     except Exception as e:
-        # その他の予期せぬエラー
-        print(f"予期せぬエラーが発生しました:{e}")
+        print(f"❌ ERROR: 予期せぬエラーが発生しました: {e}。")
 
 
 # 顧客からの返済を登録する関数
@@ -311,10 +309,7 @@ def register_repayment():
     if customer_id.isdigit() and len(customer_id) == 3:
         customer_id = f"CUST{customer_id}"
     elif not customer_id.startswith("CUST"):
-        # フォーマットが不正な場合はエラー表示して終了
-        print(
-            "❌ 顧客の形式が不正です。３桁の数字または CUSTxxx 形式で入力してください。"
-        )
+        print("❌ ERROR: 顧客IDが不正です。3桁の数字またはCUSTxxx形式で入力してください。")
         return
 
     # 返済額を入力させる
@@ -324,8 +319,7 @@ def register_repayment():
         if amount <= 0:
             raise ValueError
     except ValueError:
-        # 不正な金額入力時のエラー表示
-        print("❌金額は正の整数で入力してください。")
+        print("❌ ERROR: 金額は1円以上の整数で入力してください。")
         return
 
     # 返済日の入力（未入力の場合は今日の日付）
@@ -368,8 +362,7 @@ def register_repayment():
                 }
             )
 
-        print(f"✅ {customer_id} の返済記録を保存しました。")
-
+        print(f"✅ SUCCESS: 返済記録を保存しました（顧客ID: {customer_id}）。")
 
         # ★C-4 監査フック（成功時のみ）
         try:
@@ -381,10 +374,10 @@ def register_repayment():
                 actor="user",
             )
         except Exception as _e:
-            print(f"[WARN] audit で警告: {_e}")
+            print(f"⚠️ WARN: 監査ログの記録に失敗しました: {_e}。")
     
     except Exception as e:
-        print(f"[ERROR] 返済記録の保存に失敗しました: {e}")
+        print(f"❌ ERROR: 返済記録の保存に失敗しました: {e}。")
         return
 
 def register_repayment_api(
@@ -463,23 +456,6 @@ def register_repayment_api(
             }
         )
 
-    #header = ["loan_id", "customer_id", "repayment_amount", "repayment_date"]
-    #file_exists = os.path.exists(repayments_csv_path)
-    #need_header = (not file_exists) or (os.stat(repayments_csv_path).st_size == 0)
-
-    #with open(repayments_csv_path, "a", newline="", encoding="utf-8") as f:
-        #w = csv.DictWriter(f, fieldnames=header)
-        #if need_header:
-            #w.writeheader()
-        #w.writerow(
-            #{
-                #"loan_id": loan_id,
-                #"customer_id": customer_id,
-                #"repayment_amount": amount,
-                #"repayment_date": repayment_date,
-            #}
-        #)
-
     _audit_event(
         "REGISTER_REPAYMENT",
         loan_id=loan_id,
@@ -511,7 +487,7 @@ def is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
     loan_info = get_loan_info_by_loan_id(loans_file, loan_id)
 
     if loan_info is None:
-        print("❌ 指定された loan_id が見つからないため、この返済は記録しません。")
+        print("❌ ERROR: 指定されたloan_idは見つかりません。")
         if VERBOSE_AUDIT:  # ← 追加フラグ
             print(f"[DEV] loans_file={loans_file} loan_id={loan_id} が見つかりません。")
         return False
@@ -520,7 +496,7 @@ def is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
     try:
         repayment_expected = int(loan_info["repayment_expected"])
     except (KeyError, ValueError):
-        print("❌ 予定返済額の参照に失敗したため、この返済は記録しません。")
+        print("❌ ERROR: 予定返済額の参照に失敗したため、この返済は記録しません。")
         if VERBOSE_AUDIT:
             print(
                 f"[DEV] loan_id={loan_id} の repayment_expected を読めません。row={loan_info!r}"
@@ -528,13 +504,12 @@ def is_over_repayment(loans_file, repayments_file, loan_id, repayment_amount):
         return False
 
     # loan_idに対する返済の合計額を取得
-    # total_repaid = get_total_repaid_amount(repayments_file, loan_id)
     total_repaid = calculate_total_repaid_by_loan_id(repayments_file, loan_id) 
 
     # 合計返済額 + 入力額 > 予定返済額 か判定
     if total_repaid + repayment_amount > repayment_expected:
         remaining = max(0, repayment_expected - total_repaid)
-        print("❌ 返済額が予定額を超えるため、この返済は記録しません。")
+        print("❌ ERROR: 入力額が予定返済額を超えるため、この返済は記録しません。")
         print(
             f"   残り登録可能額：¥{remaining:,}（予定：¥{repayment_expected:,}／累計：¥{total_repaid:,}）"
         )
@@ -557,71 +532,6 @@ def _ensure_repayments_csv_initialized(repayments_csv_path: str) -> None:
         with open(repayments_csv_path, "w", newline="", encoding="utf-8") as f:
             w = csv.DictWriter(f, fieldnames=REPAYMENTS_HEADER)
             w.writeheader()
-
-#def register_repayment_complete(
-    #*,
-    #loans_file: str,
-    #repayments_file: str,
-    #loan_id: str,
-    #amount: int,
-    #repayment_date: str,
-    #actor: str = "CLI",
-#) -> dict | None:
-    """
-    D-2: 返済登録を loan_module 側で完結させる(main.py からCSV書き込みを撤去するため)
-    成功時: 追記row(dict)を返す / 失敗時: None
-    """
-
-    # loan_id存在確認
-    #info = get_loan_info_by_loan_id(loans_file, loan_id)
-    #if not info:
-        #print(f"[ERROR] loan_id {loan_id} が {os.path.basename(loans_file)} に存在しません。")
-        #return None
-    
-    # 契約解除済みはブロック
-    #if info.get("contract_status") == "CANCELLED":
-        #print(f"[ERROR] loan_id {loan_id} は契約解除済みのため返済登録できません。")
-        #return None
-    
-    # 金額バリテーション
-    #if not isinstance(amount, int) or amount <= 0:
-        #print("[ERROR] 返済金額は1円以上の整数で入力してください。")
-        #return None
-    
-    # repayments 初期化（ヘッダー）
-    #_ensure_repayments_csv_initialized(repayments_file)
-
-    # 過剰返済チェック（OKなら True / NGなら False）
-    #if not is_over_repayment(loans_file, repayments_file, loan_id, amount):
-        #return None
-    
-    #customer_id = info.get("customer_id")
-
-    #row = {
-        #"loan_id": loan_id,
-        #"customer_id": customer_id,
-        #"repayment_amount": amount,
-        #"repayment_date": repayment_date,
-    #}
-
-    # 追記
-    #with open(repayments_file, "a", newline="", encoding="utf-8") as f:
-        #w = csv.DictWriter(f, fieldnames=REPAYMENTS_HEADER)
-        #w.writerow(row)
-
-    # 監査（成功時のみ）
-    #try:
-        #append_audit(
-            #action="REGISTER_REPAYMENT",
-            #entity="loan",
-            #entity_id=loan_id,
-            #details={"customer_id": customer_id, "amount": amount, "paid_date": repayment_date},
-            #actor=actor,
-        #)
-    #except Exception as _e:
-        #print(f"[WARN] audit で警告: {_e}")
-
-    #return row
 
 # D-2.1
 def register_repayment_complete(
@@ -658,12 +568,12 @@ def register_repayment_complete(
                 break
     if info is None:
         # loan が存在しないなら、repayments に実在しないデータを作るので即中断
-        print(f"[ERROR] loan_id {loan_id} が loans に見つかりません。")
+        print("❌ ERROR: 指定されたloan_idは見つかりません。")
         return None
 
     # 3.1) 契約解除済み(CANCELLED)ローンは返済登録を禁止（仕様として安全）
     if (info.get("contract_status") or "ACTIVE").upper() == "CANCELLED":
-        print(f"[ERROR] loan_id {loan_id} は契約解除済みのため返済登録できません。")
+        print("❌ ERROR: このloan_idは契約解除済みのため返済登録できません。")
         return None
 
     # 4) 元本返済(REPAYMENT)の累計を repayments.csv から集計し、
@@ -702,10 +612,10 @@ def register_repayment_complete(
     # 6) 入力合計が「残 + 延滞手数料残」を超えたらブロック
     total_due_now = remaining_now + late_fee_remaining_now
     if amount <= 0:
-        print("[ERROR] 返済金額は1円以上の整数で入力してください。")
+        print("❌ ERROR: 返済金額は1円以上の整数で入力してください。")
         return None
     if amount > total_due_now:
-        print("❌ 入力額が『残高＋延滞手数料残』を超えるため、この返済は記録しません。")
+        print("❌ ERROR: 入力額が『残高＋延滞手数料残』を超えるため、この返済は記録しません。")
         print(f"   入力：¥{amount:,} / 残：¥{remaining_now:,} / 延滞手数料残：¥{late_fee_remaining_now:,} / 合計上限：¥{total_due_now:,}")
         return None
 
@@ -887,7 +797,7 @@ def display_unpaid_loans(
                     filtered.append(ln)
             unpaid = filtered
         elif filter_mode != "all":
-            print(f"[WARN] 未知のfilter_mode: {filter_mode} → 'all'扱い")
+            print(f"⚠️ WARN: filter_modeが不正です: {filter_mode}（'all'として処理します）。")
 
         # 4) 並び順：期日昇順→loan_id（期日なし/不正は末尾）
         def _due_key(ln):
@@ -906,7 +816,7 @@ def display_unpaid_loans(
         # 3) 表示
         if not unpaid:
             if filter_mode == "overdue":
-                print("✅ 現在延滞中の未返済はありません。")
+                print("✅ SUCCESS: 現在、延滞中の未返済はありません。")
             else:
                 print("✅ 全ての貸付は返済済みです。")
             return []
@@ -981,10 +891,6 @@ def display_unpaid_loans(
 
                     late_fee_paid_total = calculate_total_late_fee_paid_by_loan_id(repayment_file, loan_id)
                     
-                    # overdue_days = info["overdue_days"]
-                    #late_fee = info["late_fee"]
-                    #remaining = info["remaining"]
-                    #recovery_amount = info["recovery_total"]
                     overdue_days = info["overdue_days"]
 
                     # 返済日(=today)基準で発生している延滞手数料（総額）
@@ -1075,7 +981,7 @@ def display_unpaid_loans(
         return rows_out
 
     except Exception as e:
-        print(f"❌ エラーが発生しました: {e}")
+        print(f"❌ ERROR: 処理に失敗しました: {e}。")
         return []
 
 # D-2.2   
@@ -1242,7 +1148,7 @@ def get_repayment_expected(loan_id: str, loan_file: str = "loan_v3.csv") -> floa
                         return 0.0
     except FileNotFoundError:
         pass
-    raise ValueError(f"[ERROR] loan_id '{loan_id}' が {loan_file} に存在しません。")
+    raise ValueError(f"❌ ERROR: 指定されたloan_idは見つかりません。")
 
 def is_loan_fully_repaid(
     loan_id: str,
@@ -1533,7 +1439,7 @@ def cancel_contract(loan_file: str, loan_id: str, *, reason: str = "", operator:
     # 4) 既にCANCELLEDか？
     prev_status = row[idx[C9_COL_STATUS]].strip() if row[idx[C9_COL_STATUS]] else ""
     if prev_status.upper() == "CANCELLED":
-        print("❌ すでに契約解除済みの貸付です（ダブルキャンセルは無効）。")
+        print("❌ ERROR: すでに契約解除済みです。")
         try:
             _audit_event(
                 "CANCEL_CONTRACT_SKIPPED",
@@ -1542,7 +1448,7 @@ def cancel_contract(loan_file: str, loan_id: str, *, reason: str = "", operator:
                 actor="user",
             )
         except Exception as _e:
-            print(f"[WARN] audit で警告: {_e}")
+            print(f"⚠️ WARN: 監査ログの記録に失敗しました: {_e}。")
         return False
 
     # 5) 完済済みはキャンセル不可
@@ -1566,7 +1472,7 @@ def cancel_contract(loan_file: str, loan_id: str, *, reason: str = "", operator:
         repaid_sum = 0
 
     if expected > 0 and repaid_sum >= expected:
-        print("❌ この貸付はすでに完済済みのため、契約解除はできません。")
+        print("❌ ERROR: 完済済みのため、契約解除できません。")
         print(f"   予定返済額: ¥{expected:,} / 返済合計: ¥{repaid_sum:,}")
         return False
 
