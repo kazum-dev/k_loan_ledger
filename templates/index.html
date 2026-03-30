@@ -2,11 +2,16 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="with=device-width, initial-scale=1.0">
-    <kitle>K's Loan Ledger</kitle>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K's Loan Ledger</title>
 </head>
 <body>
     <h1>K's Loan Ledger</h1>
     <p>HTMLテンプレートの表示確認</p>
+
+    <h2>件数表示</h2>
+    <p>顧客数：{{ customer_count }}</p>
+    <p>貸付件数：{{ loan_count }}</p>
+    <p>返済件数：{{ repayment_count }}</p>
 </body>
 </html>
