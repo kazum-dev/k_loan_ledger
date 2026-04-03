@@ -7,11 +7,27 @@
 </head>
 <body>
     <h1>K's Loan Ledger</h1>
-    <p>HTMLテンプレートの表示確認</p>
 
-    <h2>件数表示</h2>
-    <p>顧客数：{{ customer_count }}</p>
-    <p>貸付件数：{{ loan_count }}</p>
-    <p>返済件数：{{ repayment_count }}</p>
+    <p>貸付・返済・顧客を管理するアプリです。</p>
+
+    <h2>アプリ概要</h2>
+    <p>
+       このアプリでは、顧客情報、貸付記録、返済記録を一覧で確認し、
+       管理できるようにすることを目的としています。 
+    </p>
+
+    <h2>データ概要</h2>
+    <ul>
+        <li>顧客数：{{ customer_count }}</li>
+        <li>貸付件数：{{ loan_count }}</li>
+        <li>返済件数：{{ repayment_count }}</li>
+    </ul>
+
+    <h2>メニュー</h2>
+    <ul>
+        <li><a href="#">貸付一覧を見る</a></li>
+        <li><a href="#">返済一覧を見る</a></li>
+        <li><a href="#">顧客一覧を見る</a></li>
+    </ul>    
 </body>
 </html>
