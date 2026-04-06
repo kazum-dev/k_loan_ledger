@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width", initial-scale="1.0">
+    <title>貸付一覧｜K's Loan Ledger</title>
+</head>
+<body>
+    <h1>貸付一覧</h1>
+
+    <p><a href="/">トップページに戻る</a></p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>loan_id</th>
+                <th>customer_id</th>
+                <th>loan_amount</th>
+                <th>loan_date</th>
+                <th>due_date</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for loan in loans %}
+            <tr>
+                <td>{{ loan.loan_id }}</td>
+                <td>{{ loan.customer_id }}</td>
+                <td>{{ loan.loan_amount }}</td>
+                <td>{{ loan.loan_date }}</td>
+                <td>{{ loan.due_date }}</td>
+            </tr>
+            {% endfor %}
+        </today>
+    </table>
+</body>
+</html>
