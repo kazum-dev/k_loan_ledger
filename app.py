@@ -20,6 +20,14 @@ def load_loans(file_path):
             loans.append(row)
     return loans    
 
+def load_repayments(file_path):
+    repayments = []
+    with open(file_path, "r", encoding="utf-8") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            repayments.append(row)
+    return repayments
+
 @app.route("/")
 def home():
     customer_count = count_csv_rows("data/customers.csv")
@@ -37,6 +45,11 @@ def home():
 def loan_list():
     loans = load_loans("data/loan_v3.csv")
     return render_template("loan_list.html", loans=loans)
+
+@app.route("/repayments")
+def repayment_list():
+    repayments = load_repayments("data/repayments.csv")
+    return render_template("repayment_list.html", repayments=repayments)
 
 if __name__ == "__main__":
     app.run(debug=True)

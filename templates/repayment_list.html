@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width", initial-scale="1.0">
+    <title>返済一覧｜K's Loan Ledger</title>
+</head>
+<body>
+    <h1>返済一覧</h1>
+
+    <p>登録されている返済データを一覧表示しています。</p>
+
+    <p><a href="/">トップページに戻る</a></p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>貸付ID</th>
+                <th>顧客ID</th>
+                <th>返済額</th>
+                <th>返済日</th>
+                <th>種別</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for repayment in repayments %}
+            <tr>
+                <td>{{ repayment.loan_id }}</td>
+                <td>{{ repayment.customer_id }}</td>
+                <td>{{ "{:,}".format(repayment.repayment_amount | int) }}</td>
+                <td>{{ repayment.repayment_date }}</td>
+                <td>
+                {% if repayment.payment_type == "REPAYMENT" %}
+                通常返済
+                {% elif repayment.payment_type == "LATE_FEE" %}
+                延滞手数料
+                {% else %}
+                不明
+                {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
