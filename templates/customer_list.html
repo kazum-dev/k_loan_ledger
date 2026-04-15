@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width", initial-scale="1.0">
+    <title>顧客一覧｜K's Loan Ledger</title>
+</head>
+<body>
+    <h1>顧客一覧</h1>
+
+    <p>登録されている顧客データを一覧表示しています。</p>
+
+    <p><a href="/">トップページに戻る</a></p>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>貸付ID</th>
+                <th>顧客名</th>
+                <th>貸付上限額</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for customer in customers %}
+            <tr>
+                <td>{{ customer.customer_id }}</td>
+                <td>{{ customer.customer_name }}</td>
+                <td>{{ "{:,}".format(customer.credit_limit | int) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html>
