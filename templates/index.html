@@ -8,6 +8,15 @@
 <body>
     <h1>K's Loan Ledger</h1>
 
+    <nav>
+        <ul>
+            <li><a href="{{ url_for('home') }}">トップページ</a></li>
+            <li><a href="{{ url_for('loan_list') }}">貸付一覧</a></li>
+            <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
+            <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
+        </ul>
+    </nav>
+
     <p>貸付・返済・顧客を管理するアプリです。</p>
 
     <h2>アプリ概要</h2>
@@ -22,12 +31,5 @@
         <li>貸付件数：{{ loan_count }}</li>
         <li>返済件数：{{ repayment_count }}</li>
     </ul>
-
-    <h2>メニュー</h2>
-    <ul>
-        <li><a href="/loans">貸付一覧を見る</a></li>
-        <li><a href="/repayments">返済一覧を見る</a></li>
-        <li><a href="/customers">顧客一覧を見る</a></li>
-    </ul>    
 </body>
 </html>

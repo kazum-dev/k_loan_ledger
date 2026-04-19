@@ -2,15 +2,22 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width", initial-scale="1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>返済一覧｜K's Loan Ledger</title>
 </head>
 <body>
     <h1>返済一覧</h1>
 
-    <p>登録されている返済データを一覧表示しています。</p>
+    <nav>
+        <ul>
+            <li><a href="{{ url_for('home') }}">トップページ</a></li>
+            <li><a href="{{ url_for('loan_list') }}">貸付一覧</a></li>
+            <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
+            <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
+        </ul>
+    </nav>
 
-    <p><a href="/">トップページに戻る</a></p>
+    <p>登録されている返済データを一覧表示しています。</p>
 
     <table border="1">
         <thead>
