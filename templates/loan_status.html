@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>貸付一覧｜K's Loan Ledger</title>
+    <title>未返済・延滞一覧｜K's Loan Ledger</title>
 </head>
 <body>
-    <h1>貸付一覧</h1>
+    <h1>未返済・延滞一覧</h1>
 
     <nav>
         <ul>
@@ -17,30 +17,43 @@
             <li><a href="{{ url_for('loan_status') }}">未返済・延滞一覧</a></li>
         </ul>
     </nav>
-    
-    <p>登録されている貸付データを一覧表示しています。</p>
 
+    <p>
+        repayment_expected と返済累計を比較して未返済を判定し、
+        due_date と grace_period_days をもとに延滞を判定したロジック画面です。
+    </p>
+
+    {% if unpaid_loans %}
     <table border="1">
         <thead>
             <tr>
                 <th>貸付ID</th>
                 <th>顧客ID</th>
                 <th>貸付金額</th>
-                <th>貸付日</th>
                 <th>返済期日</th>
+                <th>予定返済額</th>
+                <th>返済累計</th>
+                <th>残額</th>
+                <th>状態</th>
             </tr>
         </thead>
         <tbody>
-            {% for loan in loans %}
+            {% for loan in unpaid_loans %}
             <tr>
                 <td>{{ loan.loan_id }}</td>
                 <td>{{ loan.customer_id }}</td>
-                <td>{{ "{:,}".format(loan.loan_amount | int) }}</td>
-                <td>{{ loan.loan_date }}</td>
+                <td>{{ "{:,}".format(loan.loan_amount) }}</td>
                 <td>{{ loan.due_date }}</td>
+                <td>{{ "{:,}".format(loan.repayment_expected) }}</td>
+                <td>{{ "{:,}".format(loan.total_repaid) }}</td>
+                <td>{{ "{:,}".format(loan.remaining) }}</td>
+                <td>{{ loan.status }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    {% else %}
+    <p>未返済の貸付はありません。</p>
+    {% endif %}
 </body>
 </html>
