@@ -1,4 +1,4 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, request, redirect, url_for
 import csv
 from datetime import datetime, date, timedelta
 
@@ -145,6 +145,50 @@ def build_unpaid_loan_rows(loans, repayments):
     unpaid_rows.sort(key=lambda row: (row["due_date"], row["loan_id"]))
     return unpaid_rows
 
+def generate_loan_id(loans, loan_date):
+    """
+    loan_date をもとに LYYYYMMDD-001 形式の loan_id を生成する
+    """
+    date_part = loan_date.replace("-", "")
+    prefix = f"L{date_part}"
+
+    same_day_numbers = []
+
+    for loan in loans:
+        loan_id = loan.get("loan_id", "")
+        if loan_id.startswith(prefix):
+            try:
+                number = int(loan_id.split("-")[1])
+                same_day_numbers.append(number)
+            except (IndexError, ValueError):
+                continue
+
+    next_number = max(same_day_numbers, default=0) + 1
+    return f"{prefix}-{next_number:03d}"
+
+def save_loan_to_csv(file_path, loan_data):
+    fieldnames = [
+        "loan_id",
+        "customer_id",
+        "loan_amount",
+        "loan_date",
+        "due_date",
+        "interest_rate_percent",
+        "repayment_expected",
+        "repayment_method",
+        "grace_period_days",
+        "late_fee_rate_percent",
+        "late_base_amount",
+        "contract_status",
+        "cancelled_at",
+        "cancel_reason",
+        "notes",
+    ]
+
+    with open(file_path, "a", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writerow(loan_data)
+
 @app.route("/")
 def home():
     customer_count = count_csv_rows("data/customers.csv")
@@ -183,6 +227,67 @@ def loan_status():
         "loan_status.html",
         unpaid_loans=unpaid_loans
     )
+
+@app.route("/loans/new", methods=["GET", "POST"])
+def loan_new():
+    if request.method == "POST":
+        loans = load_loans("data/loan_v3.csv")
+
+        try:
+            customer_id = request.form.get("customer_id", "").strip()
+            loan_amount = int(request.form.get("loan_amount", 0))
+            loan_date = request.form.get("loan_date", "").strip()
+            due_date = request.form.get("due_date", "").strip()
+            interest_rate_percent = float(request.form.get("interest_rate_percent", 0))
+            repayment_method = request.form.get("repayment_method", "UNKNOWN").strip()
+            grace_period_days = int(request.form.get("grace_period_days", 0))
+            late_fee_rate_percent = float(request.form.get("late_fee_rate_percent", 0))
+            notes = request.form.get("notes", "").strip()
+
+            if not customer_id:
+                raise ValueError("顧客IDを入力してください。")
+
+            if not loan_date:
+                raise ValueError("貸付日を入力してください。")
+
+            if not due_date:
+                raise ValueError("返済期日を入力してください。")
+
+            if loan_amount <= 0:
+                raise ValueError("貸付額は1円以上で入力してください。")
+
+            repayment_expected = int(loan_amount * (1 + interest_rate_percent / 100))
+            loan_id = generate_loan_id(loans, loan_date)
+
+            loan_data = {
+                "loan_id": loan_id,
+                "customer_id": customer_id,
+                "loan_amount": loan_amount,
+                "loan_date": loan_date,
+                "due_date": due_date,
+                "interest_rate_percent": interest_rate_percent,
+                "repayment_expected": repayment_expected,
+                "repayment_method": repayment_method,
+                "grace_period_days": grace_period_days,
+                "late_fee_rate_percent": late_fee_rate_percent,
+                "late_base_amount": loan_amount,
+                "contract_status": "ACTIVE",
+                "cancelled_at": "",
+                "cancel_reason": "",
+                "notes": notes,
+            }
+
+            save_loan_to_csv("data/loan_v3.csv", loan_data)
+
+            return redirect(url_for("loan_list"))
+
+        except ValueError as e:
+            return render_template(
+                "loan_form.html",
+                error_message=str(e)
+            )
+
+    return render_template("loan_form.html")
 
 if __name__ == "__main__":
     app.run(debug=True)

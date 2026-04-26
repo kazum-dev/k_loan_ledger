@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>貸付登録</title>
+</head>
+<body>
+    <h1>貸付登録フォーム</h1>
+
+    <nav>
+        <ul>
+            <li><a href="{{ url_for('home') }}">トップページ</a></li>
+            <li><a href="{{ url_for('loan_list') }}">貸付一覧</a></li>
+            <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
+            <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
+            <li><a href="{{ url_for('loan_status') }}">未返済・延滞一覧</a></li>
+            <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
+        </ul>
+    </nav>
+
+    {% if error_message %}
+        <p style="color: red;">{{ error_message }}</p>
+    {% endif %}
+
+    <form method="POST">
+        <p>
+            <label>顧客ID：</label>
+            <input type="text" name="customer_id" required>
+        </p>
+
+        <p>
+            <label>貸付額：</label>
+            <input type="number" name="loan_amount" required>
+        </p>
+
+        <p>
+            <label>貸付日：</label>
+            <input type="date" name="loan_date" required>
+        </p>
+
+        <p>
+            <label>返済期日：</label>
+            <input type="date" name="due_date" required>
+        </p>
+
+        <p>
+            <label>通常利率（%）：</label>
+            <input type="number" step="0.1" name="interest_rate_percent" value="10.0" required>
+        </p>
+
+        <p>
+            <label>返済方法：</label>
+            <select name="repayment_method">
+                <option value="CASH">現金</option>
+                <option value="BANK_TRANSFER">銀行振込</option>
+                <option value="UNKNOWN">不明</option>
+            </select>
+        </p>
+
+        <p>
+            <label>延滞猶予日数：</label>
+            <input type="number" name="grace_period_days" value="0" required>
+        </p>
+
+        <p>
+            <label>延滞利率（%）：</label>
+            <input type="number" step="0.1" name="late_fee_rate_percent" value="10.0" required>
+        </p>
+
+        <p>
+            <label>備考：</label>
+            <input type="text" name="notes">
+        </p>
+
+        <button type="submit">登録する</button>
+    </form>
+</body>
+</html>
