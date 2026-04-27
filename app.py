@@ -232,62 +232,123 @@ def loan_status():
 def loan_new():
     if request.method == "POST":
         loans = load_loans("data/loan_v3.csv")
+        customers = load_customers("data/customers.csv")
+
+        errors = []
+
+        form_data = {
+            "customer_id": request.form.get("customer_id", "").strip(),
+            "loan_amount": request.form.get("loan_amount", "").strip(),
+            "loan_date": request.form.get("loan_date", "").strip(),
+            "due_date": request.form.get("due_date", "").strip(),
+            "interest_rate_percent": request.form.get("interest_rate_percent", "").strip(),
+            "repayment_method": request.form.get("repayment_method", "UNKNOWN").strip(),
+            "grace_period_days": request.form.get("grace_period_days", "").strip(),
+            "late_fee_rate_percent": request.form.get("late_fee_rate_percent", "").strip(),
+            "notes": request.form.get("notes", "").strip(),
+        }
+
+        customer_ids = [customer.get("customer_id", "").strip() for customer in customers]
+
+        if not form_data["customer_id"]:
+            errors.append("顧客IDを入力してください。")
+        elif form_data["customer_id"] not in customer_ids:
+            errors.append("存在しない顧客IDです。")
+
+        if not form_data["loan_amount"]:
+            errors.append("貸付額を入力してください。")
+        else:
+            try:
+                loan_amount = int(form_data["loan_amount"])
+                if loan_amount <= 0:
+                    errors.append("貸付額は1円以上で入力してください。")
+            except ValueError:
+                loan_amount = 0
+                errors.append("貸付額は数値で入力してください。")
 
         try:
-            customer_id = request.form.get("customer_id", "").strip()
-            loan_amount = int(request.form.get("loan_amount", 0))
-            loan_date = request.form.get("loan_date", "").strip()
-            due_date = request.form.get("due_date", "").strip()
-            interest_rate_percent = float(request.form.get("interest_rate_percent", 0))
-            repayment_method = request.form.get("repayment_method", "UNKNOWN").strip()
-            grace_period_days = int(request.form.get("grace_period_days", 0))
-            late_fee_rate_percent = float(request.form.get("late_fee_rate_percent", 0))
-            notes = request.form.get("notes", "").strip()
+            interest_rate_percent = float(form_data["interest_rate_percent"])
+            if interest_rate_percent < 0:
+                errors.append("通常利率は0以上で入力してください。")
+        except ValueError:
+            interest_rate_percent = 0
+            errors.append("通常利率は数値で入力してください。")
 
-            if not customer_id:
-                raise ValueError("顧客IDを入力してください。")
+        try:
+            grace_period_days = int(form_data["grace_period_days"])
+            if grace_period_days < 0:
+                errors.append("延滞猶予日数は0以上で入力してください。")
+        except ValueError:
+            grace_period_days = 0
+            errors.append("延滞猶予日数は数値で入力してください。")
 
-            if not loan_date:
-                raise ValueError("貸付日を入力してください。")
+        try:
+            late_fee_rate_percent = float(form_data["late_fee_rate_percent"])
+            if late_fee_rate_percent < 0:
+                errors.append("延滞利率は0以上で入力してください。")
+        except ValueError:
+            late_fee_rate_percent = 0
+            errors.append("延滞利率は数値で入力してください。")
 
-            if not due_date:
-                raise ValueError("返済期日を入力してください。")
+        loan_date_obj = None
+        due_date_obj = None
 
-            if loan_amount <= 0:
-                raise ValueError("貸付額は1円以上で入力してください。")
+        if not form_data["loan_date"]:
+            errors.append("貸付日を入力してください。")
+        else:
+            try:
+                loan_date_obj = datetime.strptime(form_data["loan_date"], "%Y-%m-%d").date()
+            except ValueError:
+                errors.append("貸付日の形式が正しくありません。")
 
-            repayment_expected = int(loan_amount * (1 + interest_rate_percent / 100))
-            loan_id = generate_loan_id(loans, loan_date)
+        if not form_data["due_date"]:
+            errors.append("返済期日を入力してください。")
+        else:
+            try:
+                due_date_obj = datetime.strptime(form_data["due_date"], "%Y-%m-%d").date()
+            except ValueError:
+                errors.append("返済期日の形式が正しくありません。")
 
-            loan_data = {
-                "loan_id": loan_id,
-                "customer_id": customer_id,
-                "loan_amount": loan_amount,
-                "loan_date": loan_date,
-                "due_date": due_date,
-                "interest_rate_percent": interest_rate_percent,
-                "repayment_expected": repayment_expected,
-                "repayment_method": repayment_method,
-                "grace_period_days": grace_period_days,
-                "late_fee_rate_percent": late_fee_rate_percent,
-                "late_base_amount": loan_amount,
-                "contract_status": "ACTIVE",
-                "cancelled_at": "",
-                "cancel_reason": "",
-                "notes": notes,
-            }
+        if loan_date_obj and due_date_obj:
+            if loan_date_obj > due_date_obj:
+                errors.append("返済期日は貸付日以降の日付を入力してください。")
 
-            save_loan_to_csv("data/loan_v3.csv", loan_data)
-
-            return redirect(url_for("loan_list"))
-
-        except ValueError as e:
+        if errors:
             return render_template(
                 "loan_form.html",
-                error_message=str(e)
+                errors=errors,
+                form_data=form_data
             )
 
-    return render_template("loan_form.html")
+        repayment_expected = int(loan_amount * (1 + interest_rate_percent / 100))
+        loan_id = generate_loan_id(loans, form_data["loan_date"])
+
+        loan_data = {
+            "loan_id": loan_id,
+            "customer_id": form_data["customer_id"],
+            "loan_amount": loan_amount,
+            "loan_date": form_data["loan_date"],
+            "due_date": form_data["due_date"],
+            "interest_rate_percent": interest_rate_percent,
+            "repayment_expected": repayment_expected,
+            "repayment_method": form_data["repayment_method"],
+            "grace_period_days": grace_period_days,
+            "late_fee_rate_percent": late_fee_rate_percent,
+            "late_base_amount": loan_amount,
+            "contract_status": "ACTIVE",
+            "cancelled_at": "",
+            "cancel_reason": "",
+            "notes": form_data["notes"],
+        }
+
+        save_loan_to_csv("data/loan_v3.csv", loan_data)
+
+        return redirect(url_for("loan_list"))
+
+    return render_template(
+        "loan_form.html",
+        form_data={}
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)
