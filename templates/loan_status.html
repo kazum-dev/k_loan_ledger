@@ -24,18 +24,29 @@
         due_date と grace_period_days をもとに延滞を判定したロジック画面です。
     </p>
 
+    <p>
+        延滞件数：{{ overdue_count }} 件 /
+        期日内件数：{{ unpaid_count }} 件
+    </p>
+
     {% if unpaid_loans %}
     <table border="1">
         <thead>
             <tr>
                 <th>貸付ID</th>
                 <th>顧客ID</th>
+                <th>貸付日</th>
                 <th>貸付金額</th>
                 <th>返済期日</th>
                 <th>予定返済額</th>
                 <th>返済累計</th>
                 <th>残額</th>
                 <th>状態</th>
+                <th>延滞日数</th>
+                <th>延滞手数料発生額</th>
+                <th>延滞手数料支払済</th>
+                <th>延滞手数料残額</th>
+                <th>現在回収額</th>
             </tr>
         </thead>
         <tbody>
@@ -43,12 +54,49 @@
             <tr>
                 <td>{{ loan.loan_id }}</td>
                 <td>{{ loan.customer_id }}</td>
+                <td>{{ loan.loan_date }}</td>
                 <td>{{ "{:,}".format(loan.loan_amount) }}</td>
                 <td>{{ loan.due_date }}</td>
                 <td>{{ "{:,}".format(loan.repayment_expected) }}</td>
                 <td>{{ "{:,}".format(loan.total_repaid) }}</td>
                 <td>{{ "{:,}".format(loan.remaining) }}</td>
                 <td>{{ loan.status }}</td>
+
+                <td>
+                    {% if loan.status == "OVERDUE" %}
+                        {{ loan.overdue_days }}日
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if loan.status == "OVERDUE" %}
+                        ¥{{ "{:,}".format(loan.late_fee_amount) }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if loan.status == "OVERDUE" %}
+                        ¥{{ "{:,}".format(loan.late_fee_paid) }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if loan.status == "OVERDUE" %}
+                        ¥{{ "{:,}".format(loan.late_fee_remaining) }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+
+                <td>
+                    ¥{{ "{:,}".format(loan.current_collect_amount) }}
+                </td>
             </tr>
             {% endfor %}
         </tbody>

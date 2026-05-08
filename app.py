@@ -64,6 +64,29 @@ def calculate_total_repaid_map(repayments):
 
     return repaid_map
 
+def calculate_late_fee_paid_map(repayments):
+    """
+    loan_idごとの延滞手数料支払済額を辞書で返す
+    - payment_type == "LATE_FEE" のみ集計
+    """
+    late_fee_paid_map = {}
+
+    for row in repayments:
+        loan_id = row.get("loan_id", "").strip()
+        payment_type = row.get("payment_type", "").strip().upper()
+
+        if payment_type != "LATE_FEE":
+            continue
+
+        try:
+            amount = int(float(row.get("repayment_amount", 0)))
+        except ValueError:
+            amount = 0
+
+        late_fee_paid_map[loan_id] = late_fee_paid_map.get(loan_id, 0) + amount
+
+    return late_fee_paid_map
+
 def calc_overdue_days(today, due_date_str, grace_period_days):
     """
     due_date + grace_period_days を過ぎていれば延滞日数を返す
@@ -79,6 +102,7 @@ def build_unpaid_loan_rows(loans, repayments):
     """
     today = date.today()
     repaid_map = calculate_total_repaid_map(repayments)
+    late_fee_paid_map = calculate_late_fee_paid_map(repayments)
     unpaid_rows = []
 
     for loan in loans:
@@ -109,7 +133,22 @@ def build_unpaid_loan_rows(loans, repayments):
             grace_period_days = 0
 
         total_repaid = repaid_map.get(loan_id, 0)
+        late_fee_paid = late_fee_paid_map.get(loan_id, 0)
         remaining = repayment_expected - total_repaid
+
+        try:
+            late_fee_rate_percent = float(
+                loan.get("late_fee_rate_percent", 0)
+            )
+        except ValueError:
+            late_fee_rate_percent = 0
+
+        try:
+            late_base_amount = int(
+                float(loan.get("late_base_amount", 0))
+            )
+        except ValueError:
+            late_base_amount = 0
 
         # 完済なら除外
         if repayment_expected <= total_repaid:
@@ -118,12 +157,36 @@ def build_unpaid_loan_rows(loans, repayments):
         status = "UNPAID"
         overdue_days = 0
 
+        late_fee_amount = 0
+        late_fee_remaining = 0
+        current_collect_amount = remaining
+
         # due_date があるときだけ延滞判定
         if due_date:
             try:
-                overdue_days = calc_overdue_days(today, due_date, grace_period_days)
+                overdue_days = calc_overdue_days(
+                    today,
+                    due_date,
+                    grace_period_days
+                )
+
                 if overdue_days > 0:
                     status = "OVERDUE"
+
+                    late_fee_amount = int(
+                        late_base_amount
+                        * (late_fee_rate_percent / 100)
+                        * (overdue_days / 30)
+                    )
+
+                    late_fee_remaining = max(
+                        0,
+                        late_fee_amount - late_fee_paid
+                    )
+
+                    current_collect_amount = (
+                        remaining + late_fee_remaining
+                    )
             except ValueError:
                 # 日付不正時は今回は最低限、未返済扱いで残す
                 status = "UNPAID"
@@ -133,12 +196,17 @@ def build_unpaid_loan_rows(loans, repayments):
                 "loan_id": loan_id,
                 "customer_id": customer_id,
                 "loan_amount": loan_amount,
+                "loan_date": loan.get("loan_date", "").strip(),
                 "due_date": due_date,
                 "repayment_expected": repayment_expected,
                 "total_repaid": total_repaid,
                 "remaining": remaining,
                 "status": status,
                 "overdue_days": overdue_days,
+                "late_fee_paid": late_fee_paid,
+                "late_fee_amount": late_fee_amount,
+                "late_fee_remaining": late_fee_remaining,
+                "current_collect_amount": current_collect_amount,
             }
         )
 
@@ -221,11 +289,24 @@ def customer_list():
 def loan_status():
     loans = load_loans("data/loan_v3.csv")
     repayments = load_repayments("data/repayments.csv")
+
     unpaid_loans = build_unpaid_loan_rows(loans, repayments)
+
+    overdue_count = sum(
+        1 for loan in unpaid_loans
+        if loan["status"] == "OVERDUE"
+    )
+
+    unpaid_count = sum(
+        1 for loan in unpaid_loans
+        if loan["status"] == "UNPAID"
+    )
 
     return render_template(
         "loan_status.html",
-        unpaid_loans=unpaid_loans
+        unpaid_loans=unpaid_loans,
+        overdue_count=overdue_count,
+        unpaid_count=unpaid_count,
     )
 
 @app.route("/loans/new", methods=["GET", "POST"])
