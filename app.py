@@ -257,6 +257,19 @@ def save_loan_to_csv(file_path, loan_data):
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writerow(loan_data)
 
+def save_repayment_to_csv(file_path, repayment_data):
+    fieldnames = [
+        "loan_id",
+        "customer_id",
+        "repayment_amount",
+        "repayment_date",
+        "payment_type",
+    ]
+
+    with open(file_path, "a", encoding="utf-8", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writerow(repayment_data)
+
 @app.route("/")
 def home():
     customer_count = count_csv_rows("data/customers.csv")
@@ -279,6 +292,106 @@ def loan_list():
 def repayment_list():
     repayments = load_repayments("data/repayments.csv")
     return render_template("repayment_list.html", repayments=repayments)
+
+@app.route("/repayments/new", methods=["GET", "POST"])
+def repayment_new():
+
+    if request.method == "POST":
+
+        loans = load_loans("data/loan_v3.csv")
+
+        errors = []
+
+        form_data = {
+            "loan_id": request.form.get("loan_id", "").strip(),
+            "repayment_amount": request.form.get("repayment_amount", "").strip(),
+            "repayment_date": request.form.get("repayment_date", "").strip(),
+        }
+
+        # loan_id 一覧取得
+        loan_ids = [
+            loan.get("loan_id", "").strip()
+            for loan in loans
+        ]
+
+        # loan_id チェック
+        if not form_data["loan_id"]:
+            errors.append("loan_id を入力してください。")
+
+        elif form_data["loan_id"] not in loan_ids:
+            errors.append("存在しない loan_id です。")
+
+        # 返済金額チェック
+        if not form_data["repayment_amount"]:
+            errors.append("返済金額を入力してください。")
+
+        else:
+            try:
+                repayment_amount = int(form_data["repayment_amount"])
+
+                if repayment_amount <= 0:
+                    errors.append("返済金額は1円以上で入力してください。")
+
+            except ValueError:
+                repayment_amount = 0
+                errors.append("返済金額は数値で入力してください。")
+
+        # 返済日チェック
+        if not form_data["repayment_date"]:
+
+            today_str = date.today().strftime("%Y-%m-%d")
+
+            form_data["repayment_date"] = today_str
+
+        else:
+            try:
+                datetime.strptime(
+                    form_data["repayment_date"],
+                    "%Y-%m-%d"
+                )
+
+            except ValueError:
+                errors.append("返済日の形式が正しくありません。")
+
+        # エラーがある場合
+        if errors:
+
+            return render_template(
+                "repayment_form.html",
+                errors=errors,
+                form_data=form_data
+            )
+
+        # customer_id を取得
+        customer_id = ""
+
+        for loan in loans:
+
+            if loan.get("loan_id", "").strip() == form_data["loan_id"]:
+
+                customer_id = loan.get("customer_id", "").strip()
+                break
+
+        repayment_data = {
+            "loan_id": form_data["loan_id"],
+            "customer_id": customer_id,
+            "repayment_amount": repayment_amount,
+            "repayment_date": form_data["repayment_date"],
+            "payment_type": "REPAYMENT",
+        }
+
+        save_repayment_to_csv(
+            "data/repayments.csv",
+            repayment_data
+        )
+
+        return redirect(url_for("repayment_list"))
+
+    return render_template(
+        "repayment_form.html",
+        form_data={},
+        errors=[]
+    )
 
 @app.route("/customers")
 def customer_list():

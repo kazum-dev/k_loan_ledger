@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>返済登録</title>
+</head>
+<body>
+    <h1>返済登録</h1>
+
+    <nav>
+        <ul>
+            <li><a href="{{ url_for('home') }}">トップページ</a></li>
+            <li><a href="{{ url_for('loan_list') }}">貸付一覧</a></li>
+            <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
+            <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
+            <li><a href="{{ url_for('loan_status') }}">未返済・延滞一覧</a></li>
+            <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
+            <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
+        </ul>
+    </nav>
+
+    {% if errors %}
+        <ul>
+            {% for error in errors %}
+                <li style="color: red;">{{ error }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <form method="POST">
+        <div>
+            <label>loan_id</label>
+            <input type="text" name="loan_id" value="{{ form_data.get('loan_id', '') }}">
+        </div>
+
+        <div>
+            <label>返済金額</label>
+            <input type="text" name="repayment_amount" value="{{ form_data.get('repayment_amount', '') }}">
+        </div>
+
+        <div>
+            <label>返済日</label>
+            <input type="date" name="repayment_date" value="{{ form_data.get('repayment_date', '') }}">
+        </div>
+
+        <button type="submit">返済を登録する</button>
+    </form>
+</body>
+</html>
