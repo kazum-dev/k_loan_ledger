@@ -43,6 +43,20 @@
             <input type="date" name="repayment_date" value="{{ form_data.get('repayment_date', '') }}">
         </div>
 
+        <div>
+            <label>返済種別</label>
+            <select name="payment_type">
+                <option value="REPAYMENT"
+                    {% if form_data.get('payment_type', 'REPAYMENT') == 'REPAYMENT' %}selected{% endif %}>
+                    通常返済
+                </option>
+                <option value="LATE_FEE"
+                    {% if form_data.get('payment_type') == 'LATE_FEE' %}selected{% endif %}>
+                    延滞手数料返済
+                </option>
+            </select>
+        </div>
+
         <button type="submit">返済を登録する</button>
     </form>
 </body>

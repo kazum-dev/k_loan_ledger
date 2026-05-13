@@ -134,7 +134,7 @@ def build_unpaid_loan_rows(loans, repayments):
 
         total_repaid = repaid_map.get(loan_id, 0)
         late_fee_paid = late_fee_paid_map.get(loan_id, 0)
-        remaining = repayment_expected - total_repaid
+        remaining = max(0, repayment_expected - total_repaid)
 
         try:
             late_fee_rate_percent = float(
@@ -149,10 +149,6 @@ def build_unpaid_loan_rows(loans, repayments):
             )
         except ValueError:
             late_base_amount = 0
-
-        # 完済なら除外
-        if repayment_expected <= total_repaid:
-            continue
 
         status = "UNPAID"
         overdue_days = 0
@@ -190,6 +186,10 @@ def build_unpaid_loan_rows(loans, repayments):
             except ValueError:
                 # 日付不正時は今回は最低限、未返済扱いで残す
                 status = "UNPAID"
+
+        # 通常残高と延滞手数料残額がどちらも0なら除外
+        if remaining <= 0 and late_fee_remaining <= 0:
+            continue
 
         unpaid_rows.append(
             {
@@ -300,13 +300,25 @@ def repayment_new():
 
         loans = load_loans("data/loan_v3.csv")
 
+        repayments = load_repayments("data/repayments.csv")
+        repaid_map = calculate_total_repaid_map(repayments)
+        late_fee_paid_map = calculate_late_fee_paid_map(repayments)
+
         errors = []
 
         form_data = {
             "loan_id": request.form.get("loan_id", "").strip(),
             "repayment_amount": request.form.get("repayment_amount", "").strip(),
             "repayment_date": request.form.get("repayment_date", "").strip(),
+            "payment_type": request.form.get("payment_type", "REPAYMENT").strip().upper(),
         }
+
+        target_loan = None
+
+        for loan in loans:
+            if loan.get("loan_id", "").strip() == form_data["loan_id"]:
+                target_loan = loan
+                break
 
         # loan_id 一覧取得
         loan_ids = [
@@ -336,6 +348,81 @@ def repayment_new():
                 repayment_amount = 0
                 errors.append("返済金額は数値で入力してください。")
 
+        # 返済種別ごとの登録可否チェック
+        if target_loan and not errors:
+            try:
+                repayment_expected = int(float(target_loan.get("repayment_expected", 0)))
+            except ValueError:
+                repayment_expected = 0
+
+            total_repaid = repaid_map.get(form_data["loan_id"], 0)
+            normal_remaining = max(0, repayment_expected - total_repaid)
+
+            try:
+                grace_period_days = int(float(target_loan.get("grace_period_days", 0)))
+            except ValueError:
+                grace_period_days = 0
+
+            try:
+                late_fee_rate_percent = float(target_loan.get("late_fee_rate_percent", 0))
+            except ValueError:
+                late_fee_rate_percent = 0
+
+            try:
+                late_base_amount = int(float(target_loan.get("late_base_amount", 0)))
+            except ValueError:
+                late_base_amount = 0
+
+            due_date = target_loan.get("due_date", "").strip()
+            overdue_days = 0
+            late_fee_amount = 0
+
+            if due_date:
+                try:
+                    overdue_days = calc_overdue_days(
+                        date.today(),
+                        due_date,
+                        grace_period_days
+                    )
+
+                    if overdue_days > 0:
+                        late_fee_amount = int(
+                            late_base_amount
+                            * (late_fee_rate_percent / 100)
+                            * (overdue_days / 30)
+                        )
+
+                except ValueError:
+                    overdue_days = 0
+                    late_fee_amount = 0
+
+            late_fee_paid = late_fee_paid_map.get(form_data["loan_id"], 0)
+            late_fee_remaining = max(0, late_fee_amount - late_fee_paid)
+
+            if form_data["payment_type"] == "REPAYMENT":
+                if normal_remaining <= 0:
+                    errors.append("この貸付は通常返済がすでに完了しています。")
+
+                elif repayment_amount > normal_remaining:
+                    errors.append(
+                        f"通常返済額が通常残高を超えています。通常残高は {normal_remaining} 円です。"
+                    )
+
+            elif form_data["payment_type"] == "LATE_FEE":
+                if overdue_days <= 0:
+                    errors.append("この貸付には現在、延滞手数料が発生していません。")
+
+                elif late_fee_amount <= 0:
+                    errors.append("この貸付には現在、延滞手数料が発生していません。")
+
+                elif late_fee_remaining <= 0:
+                    errors.append("この貸付の延滞手数料はすでに支払い済みです。")
+
+                elif repayment_amount > late_fee_remaining:
+                    errors.append(
+                        f"延滞手数料返済額が延滞手数料残額を超えています。延滞手数料残額は {late_fee_remaining} 円です。"
+                    )
+
         # 返済日チェック
         if not form_data["repayment_date"]:
 
@@ -352,6 +439,12 @@ def repayment_new():
 
             except ValueError:
                 errors.append("返済日の形式が正しくありません。")
+
+        # 返済種別チェック
+        valid_payment_types = ["REPAYMENT", "LATE_FEE"]
+
+        if form_data["payment_type"] not in valid_payment_types:
+            errors.append("返済種別が正しくありません。")
 
         # エラーがある場合
         if errors:
@@ -377,7 +470,7 @@ def repayment_new():
             "customer_id": customer_id,
             "repayment_amount": repayment_amount,
             "repayment_date": form_data["repayment_date"],
-            "payment_type": "REPAYMENT",
+            "payment_type": form_data["payment_type"],
         }
 
         save_repayment_to_csv(
