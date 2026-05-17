@@ -167,8 +167,6 @@ def build_unpaid_loan_rows(loans, repayments):
                 )
 
                 if overdue_days > 0:
-                    status = "OVERDUE"
-
                     late_fee_amount = int(
                         late_base_amount
                         * (late_fee_rate_percent / 100)
@@ -180,11 +178,16 @@ def build_unpaid_loan_rows(loans, repayments):
                         late_fee_amount - late_fee_paid
                     )
 
-                    current_collect_amount = (
-                        remaining + late_fee_remaining
-                    )
+                current_collect_amount = remaining + late_fee_remaining
+
+                if remaining > 0 and overdue_days > 0:
+                    status = "OVERDUE"
+                elif remaining > 0:
+                    status = "UNPAID"
+                elif remaining <= 0 and late_fee_remaining > 0:
+                    status = "LATE_FEE_ONLY"
+
             except ValueError:
-                # 日付不正時は今回は最低限、未返済扱いで残す
                 status = "UNPAID"
 
         # 通常残高と延滞手数料残額がどちらも0なら除外
@@ -202,6 +205,11 @@ def build_unpaid_loan_rows(loans, repayments):
                 "total_repaid": total_repaid,
                 "remaining": remaining,
                 "status": status,
+                "status_label": {
+                    "UNPAID": "期日内未返済",
+                    "OVERDUE": "延滞中",
+                    "LATE_FEE_ONLY": "延滞手数料のみ未払い",
+                }.get(status, status),
                 "overdue_days": overdue_days,
                 "late_fee_paid": late_fee_paid,
                 "late_fee_amount": late_fee_amount,
@@ -508,11 +516,17 @@ def loan_status():
         if loan["status"] == "UNPAID"
     )
 
+    late_fee_only_count = sum(
+        1 for loan in unpaid_loans
+        if loan["status"] == "LATE_FEE_ONLY"
+    )
+
     return render_template(
         "loan_status.html",
         unpaid_loans=unpaid_loans,
         overdue_count=overdue_count,
         unpaid_count=unpaid_count,
+        late_fee_only_count=late_fee_only_count,
     )
 
 @app.route("/loans/new", methods=["GET", "POST"])

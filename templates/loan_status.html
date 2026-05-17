@@ -27,7 +27,8 @@
 
     <p>
         延滞件数：{{ overdue_count }} 件 /
-        期日内件数：{{ unpaid_count }} 件
+        期日内件数：{{ unpaid_count }} 件 /
+        延滞手数料のみ未払い：{{ late_fee_only_count }} 件
     </p>
 
     {% if unpaid_loans %}
@@ -61,10 +62,10 @@
                 <td>{{ "{:,}".format(loan.repayment_expected) }}</td>
                 <td>{{ "{:,}".format(loan.total_repaid) }}</td>
                 <td>{{ "{:,}".format(loan.remaining) }}</td>
-                <td>{{ loan.status }}</td>
+                <td>{{ loan.status_label }}</td>
 
                 <td>
-                    {% if loan.status == "OVERDUE" %}
+                    {% if loan.status == "OVERDUE" or loan.status == "LATE_FEE_ONLY" %}
                         {{ loan.overdue_days }}日
                     {% else %}
                         -
@@ -72,7 +73,7 @@
                 </td>
 
                 <td>
-                    {% if loan.status == "OVERDUE" %}
+                    {% if loan.status == "OVERDUE" or loan.status == "LATE_FEE_ONLY" %}
                         ¥{{ "{:,}".format(loan.late_fee_amount) }}
                     {% else %}
                         -
@@ -80,7 +81,7 @@
                 </td>
 
                 <td>
-                    {% if loan.status == "OVERDUE" %}
+                    {% if loan.status == "OVERDUE" or loan.status == "LATE_FEE_ONLY" %}
                         ¥{{ "{:,}".format(loan.late_fee_paid) }}
                     {% else %}
                         -
@@ -88,7 +89,7 @@
                 </td>
 
                 <td>
-                    {% if loan.status == "OVERDUE" %}
+                    {% if loan.status == "OVERDUE" or loan.status == "LATE_FEE_ONLY" %}
                         ¥{{ "{:,}".format(loan.late_fee_remaining) }}
                     {% else %}
                         -
