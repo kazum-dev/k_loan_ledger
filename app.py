@@ -321,12 +321,25 @@ def repayment_new():
             "payment_type": request.form.get("payment_type", "REPAYMENT").strip().upper(),
         }
 
+        # 返済種別チェック
+        valid_payment_types = ["REPAYMENT", "LATE_FEE"]
+
+        if form_data["payment_type"] not in valid_payment_types:
+            errors.append("返済種別が正しくありません。")
+
         target_loan = None
 
         for loan in loans:
             if loan.get("loan_id", "").strip() == form_data["loan_id"]:
                 target_loan = loan
                 break
+
+        # 取消済み貸付への返済禁止チェック
+        if target_loan:
+            contract_status = target_loan.get("contract_status", "").strip().upper()
+
+            if contract_status == "CANCELLED":
+                errors.append("取消済みの貸付には返済登録できません。")
 
         # loan_id 一覧取得
         loan_ids = [
@@ -447,12 +460,6 @@ def repayment_new():
 
             except ValueError:
                 errors.append("返済日の形式が正しくありません。")
-
-        # 返済種別チェック
-        valid_payment_types = ["REPAYMENT", "LATE_FEE"]
-
-        if form_data["payment_type"] not in valid_payment_types:
-            errors.append("返済種別が正しくありません。")
 
         # エラーがある場合
         if errors:
