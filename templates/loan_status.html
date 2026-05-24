@@ -15,6 +15,7 @@
             <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
             <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
             <li><a href="{{ url_for('loan_status') }}">未返済・延滞一覧</a></li>
+            <li><a href="{{ url_for('overdue_loans') }}">延滞貸付一覧</a></li>
             <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
             <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
         </ul>
@@ -30,6 +31,18 @@
         期日内件数：{{ unpaid_count }} 件 /
         延滞手数料のみ未払い：{{ late_fee_only_count }} 件
     </p>
+
+    <h2>未返済サマリー</h2>
+
+    <ul>
+        <li>表示中の貸付件数：{{ unpaid_loans|length }} 件</li>
+        <li>貸付金額合計：¥{{ "{:,}".format(total_loan_amount) }}</li>
+        <li>予定返済額合計：¥{{ "{:,}".format(total_repayment_expected) }}</li>
+        <li>返済累計合計：¥{{ "{:,}".format(total_repaid) }}</li>
+        <li>残額合計：¥{{ "{:,}".format(total_remaining) }}</li>
+        <li>延滞手数料残額合計：¥{{ "{:,}".format(total_late_fee_remaining) }}</li>
+        <li>現在回収額合計：¥{{ "{:,}".format(total_current_collect_amount) }}</li>
+    </ul>
 
     {% if unpaid_loans %}
     <table border="1">

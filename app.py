@@ -528,12 +528,59 @@ def loan_status():
         if loan["status"] == "LATE_FEE_ONLY"
     )
 
+    total_loan_amount = sum(
+        loan["loan_amount"] for loan in unpaid_loans
+    )
+
+    total_repayment_expected = sum(
+        loan["repayment_expected"] for loan in unpaid_loans
+    )
+
+    total_repaid = sum(
+        loan["total_repaid"] for loan in unpaid_loans
+    )
+
+    total_remaining = sum(
+        loan["remaining"] for loan in unpaid_loans
+    )
+
+    total_late_fee_remaining = sum(
+        loan["late_fee_remaining"] for loan in unpaid_loans
+    )
+
+    total_current_collect_amount = sum(
+        loan["current_collect_amount"] for loan in unpaid_loans
+    )
+
     return render_template(
         "loan_status.html",
         unpaid_loans=unpaid_loans,
         overdue_count=overdue_count,
         unpaid_count=unpaid_count,
         late_fee_only_count=late_fee_only_count,
+        total_loan_amount=total_loan_amount,
+        total_repayment_expected=total_repayment_expected,
+        total_repaid=total_repaid,
+        total_remaining=total_remaining,
+        total_late_fee_remaining=total_late_fee_remaining,
+        total_current_collect_amount=total_current_collect_amount,
+    )
+
+@app.route("/overdue-loans")
+def overdue_loans():
+    loans = load_loans("data/loan_v3.csv")
+    repayments = load_repayments("data/repayments.csv")
+
+    unpaid_loans = build_unpaid_loan_rows(loans, repayments)
+
+    overdue_loans = [
+        loan for loan in unpaid_loans
+        if loan["status"] in ["OVERDUE", "LATE_FEE_ONLY"]
+    ]
+
+    return render_template(
+        "overdue_loans.html",
+        overdue_loans=overdue_loans
     )
 
 @app.route("/loans/new", methods=["GET", "POST"])
