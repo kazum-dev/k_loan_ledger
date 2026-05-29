@@ -278,6 +278,12 @@ def save_repayment_to_csv(file_path, repayment_data):
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writerow(repayment_data)
 
+def save_customer_to_csv(file_path, customer_data):
+    with open(file_path, "a", encoding="utf-8", newline="") as file:
+        fieldnames = ["customer_id", "customer_name", "credit_limit"]
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writerow(customer_data)
+
 @app.route("/")
 def home():
     customer_count = count_csv_rows("data/customers.csv")
@@ -505,6 +511,64 @@ def repayment_new():
 def customer_list():
     customers = load_customers("data/customers.csv")
     return render_template("customer_list.html", customers=customers)
+
+@app.route("/customers/new", methods=["GET", "POST"])
+def new_customer():
+    errors = []
+    form_data = {
+        "customer_id": "",
+        "customer_name": "",
+        "credit_limit": "",
+    }
+
+    if request.method == "POST":
+        customer_id = request.form.get("customer_id", "").strip()
+        customer_name = request.form.get("customer_name", "").strip()
+        credit_limit = request.form.get("credit_limit", "").strip()
+
+        form_data = {
+            "customer_id": customer_id,
+            "customer_name": customer_name,
+            "credit_limit": credit_limit,
+        }
+
+        if customer_id == "":
+            errors.append("顧客IDを入力してください。")
+
+        if customer_name == "":
+            errors.append("顧客名を入力してください。")
+
+        if credit_limit == "":
+            errors.append("貸付上限額を入力してください。")
+        else:
+            try:
+                credit_limit_int = int(credit_limit)
+                if credit_limit_int <= 0:
+                    errors.append("貸付上限額は1円以上で入力してください。")
+            except ValueError:
+                errors.append("貸付上限額は数値で入力してください。")
+
+        customers = load_customers("data/customers.csv")
+        for customer in customers:
+            if customer["customer_id"] == customer_id:
+                errors.append("この顧客IDはすでに登録されています。")
+                break
+
+        if not errors:
+            customer_data = {
+                "customer_id": customer_id,
+                "customer_name": customer_name,
+                "credit_limit": credit_limit_int,
+            }
+
+            save_customer_to_csv("data/customers.csv", customer_data)
+            return redirect("/customers")
+
+    return render_template(
+        "customer_form.html",
+        errors=errors,
+        form_data=form_data
+    )
 
 @app.route("/loan-status")
 def loan_status():

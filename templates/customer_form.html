@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>顧客登録</title>
+</head>
+<body>
+    <h1>顧客登録</h1>
+
+    <nav>
+        <ul>
+            <li><a href="{{ url_for('home') }}">トップページ</a></li>
+            <li><a href="{{ url_for('loan_list') }}">貸付一覧</a></li>
+            <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
+            <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
+            <li><a href="{{ url_for('loan_status') }}">未返済・延滞一覧</a></li>
+            <li><a href="{{ url_for('overdue_loans') }}">延滞貸付一覧</a></li>
+            <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
+            <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
+            <li><a href="/customers/new">顧客登録</a></li>
+        </ul>
+    </nav>
+
+    {% if errors %}
+        <div style="color: red;">
+            <ul>
+                {% for error in errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <form method="POST">
+        <div>
+            <label for="customer_id">顧客ID</label>
+            <input
+                type="text"
+                id="customer_id"
+                name="customer_id"
+                value="{{ form_data.customer_id }}"
+            >
+        </div>
+
+        <div>
+            <label for="customer_name">顧客名</label>
+            <input
+                type="text"
+                id="customer_name"
+                name="customer_name"
+                value="{{ form_data.customer_name }}"
+            >
+        </div>
+
+        <div>
+            <label for="credit_limit">貸付上限額</label>
+            <input
+                type="text"
+                id="credit_limit"
+                name="credit_limit"
+                value="{{ form_data.credit_limit }}"
+            >
+        </div>
+
+        <button type="submit">登録する</button>
+    </form>
+
+    <p><a href="/customers">顧客一覧へ戻る</a></p>
+</body>
+</html>
