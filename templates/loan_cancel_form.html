@@ -2,10 +2,12 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>返済登録</title>
+    <title>契約解除登録 | K's Loan Ledger</title>
 </head>
 <body>
-    <h1>返済登録</h1>
+    <h1>契約解除登録</h1>
+
+    <p>指定した貸付IDの契約状態を CANCELLED に更新します。</p>
 
     <nav>
         <ul>
@@ -30,37 +32,32 @@
         </ul>
     {% endif %}
 
-    <form method="POST">
+    <form method="post">
         <div>
-            <label>貸付ID</label>
-            <input type="text" name="loan_id" value="{{ form_data.get('loan_id', '') }}">
+            <label for="loan_id">貸付ID</label><br>
+            <input
+                type="text"
+                id="loan_id"
+                name="loan_id"
+                value="{{ form_data.get('loan_id', '') }}"
+            >
         </div>
 
-        <div>
-            <label>返済金額</label>
-            <input type="text" name="repayment_amount" value="{{ form_data.get('repayment_amount', '') }}">
-        </div>
+        <br>
 
         <div>
-            <label>返済日</label>
-            <input type="date" name="repayment_date" value="{{ form_data.get('repayment_date', '') }}">
+            <label for="cancel_reason">契約解除理由</label><br>
+            <textarea
+                id="cancel_reason"
+                name="cancel_reason"
+                rows="4"
+                cols="50"
+            >{{ form_data.get('cancel_reason', '') }}</textarea>
         </div>
 
-        <div>
-            <label>返済種別</label>
-            <select name="payment_type">
-                <option value="REPAYMENT"
-                    {% if form_data.get('payment_type', 'REPAYMENT') == 'REPAYMENT' %}selected{% endif %}>
-                    通常返済
-                </option>
-                <option value="LATE_FEE"
-                    {% if form_data.get('payment_type') == 'LATE_FEE' %}selected{% endif %}>
-                    延滞手数料返済
-                </option>
-            </select>
-        </div>
+        <br>
 
-        <button type="submit">返済を登録する</button>
+        <button type="submit">契約解除を登録する</button>
     </form>
 </body>
 </html>

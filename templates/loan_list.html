@@ -19,6 +19,7 @@
             <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
             <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
             <li><a href="/customers/new">顧客登録</a></li>
+            <li><a href="{{ url_for('loan_cancel') }}">契約解除登録</a></li>
         </ul>
     </nav>
     
@@ -32,6 +33,9 @@
                 <th>貸付金額</th>
                 <th>貸付日</th>
                 <th>返済期日</th>
+                <th>契約状態</th>
+                <th>解除日</th>
+                <th>解除理由</th>
             </tr>
         </thead>
         <tbody>
@@ -42,6 +46,9 @@
                 <td>{{ "{:,}".format(loan.loan_amount | int) }}</td>
                 <td>{{ loan.loan_date }}</td>
                 <td>{{ loan.due_date }}</td>
+                <td>{{ loan.contract_status }}</td>
+                <td>{{ loan.cancelled_at }}</td>
+                <td>{{ loan.cancel_reason }}</td>
             </tr>
             {% endfor %}
         </tbody>

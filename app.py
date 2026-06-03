@@ -284,6 +284,48 @@ def save_customer_to_csv(file_path, customer_data):
         writer = csv.DictWriter(file, fieldnames=fieldnames)
         writer.writerow(customer_data)
 
+def update_loan_cancel_status(file_path, target_loan_id, cancel_reason):
+    """
+    指定した loan_id の契約状態を CANCELLED に更新する
+    """
+    loans = load_loans(file_path)
+    updated = False
+    today_str = date.today().strftime("%Y-%m-%d")
+
+    fieldnames = [
+        "loan_id",
+        "customer_id",
+        "loan_amount",
+        "loan_date",
+        "due_date",
+        "interest_rate_percent",
+        "repayment_expected",
+        "repayment_method",
+        "grace_period_days",
+        "late_fee_rate_percent",
+        "late_base_amount",
+        "contract_status",
+        "cancelled_at",
+        "cancel_reason",
+        "notes",
+    ]
+
+    for loan in loans:
+        if loan.get("loan_id", "").strip() == target_loan_id:
+            loan["contract_status"] = "CANCELLED"
+            loan["cancelled_at"] = today_str
+            loan["cancel_reason"] = cancel_reason
+            updated = True
+            break
+
+    if updated:
+        with open(file_path, "w", encoding="utf-8", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(loans)
+
+    return updated
+
 @app.route("/")
 def home():
     customer_count = count_csv_rows("data/customers.csv")
@@ -645,6 +687,62 @@ def overdue_loans():
     return render_template(
         "overdue_loans.html",
         overdue_loans=overdue_loans
+    )
+
+@app.route("/loans/cancel", methods=["GET", "POST"])
+def loan_cancel():
+    errors = []
+    form_data = {
+        "loan_id": "",
+        "cancel_reason": "",
+    }
+
+    if request.method == "POST":
+        loans = load_loans("data/loan_v3.csv")
+
+        form_data = {
+            "loan_id": request.form.get("loan_id", "").strip(),
+            "cancel_reason": request.form.get("cancel_reason", "").strip(),
+        }
+
+        target_loan = None
+
+        for loan in loans:
+            if loan.get("loan_id", "").strip() == form_data["loan_id"]:
+                target_loan = loan
+                break
+
+        if not form_data["loan_id"]:
+            errors.append("貸付IDを入力してください。")
+
+        elif target_loan is None:
+            errors.append("存在しない貸付IDです。")
+
+        elif target_loan.get("contract_status", "").strip().upper() == "CANCELLED":
+            errors.append("この貸付はすでに契約解除済みです。")
+
+        if not form_data["cancel_reason"]:
+            errors.append("契約解除理由を入力してください。")
+
+        if errors:
+            return render_template(
+                "loan_cancel_form.html",
+                errors=errors,
+                form_data=form_data
+            )
+
+        update_loan_cancel_status(
+            "data/loan_v3.csv",
+            form_data["loan_id"],
+            form_data["cancel_reason"]
+        )
+
+        return redirect(url_for("loan_status"))
+
+    return render_template(
+        "loan_cancel_form.html",
+        errors=errors,
+        form_data=form_data
     )
 
 @app.route("/loans/new", methods=["GET", "POST"])
