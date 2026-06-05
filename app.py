@@ -326,6 +326,19 @@ def update_loan_cancel_status(file_path, target_loan_id, cancel_reason):
 
     return updated
 
+def get_contract_status_label(contract_status):
+    """
+    contract_status を日本語表示に変換する
+    """
+    status = (contract_status or "").strip().upper()
+
+    labels = {
+        "ACTIVE": "有効",
+        "CANCELLED": "契約解除済み",
+    }
+
+    return labels.get(status, "不明")
+
 @app.route("/")
 def home():
     customer_count = count_csv_rows("data/customers.csv")
@@ -737,12 +750,48 @@ def loan_cancel():
             form_data["cancel_reason"]
         )
 
-        return redirect(url_for("loan_status"))
+        return redirect(url_for("loan_contracts"))
 
     return render_template(
         "loan_cancel_form.html",
         errors=errors,
         form_data=form_data
+    )
+
+@app.route("/loan-contracts")
+def loan_contracts():
+    loans = load_loans("data/loan_v3.csv")
+
+    active_count = 0
+    cancelled_count = 0
+
+    cancelled_loans = []
+
+    for loan in loans:
+        status = (
+            loan.get("contract_status", "")
+            .strip()
+            .upper()
+        )
+
+        loan["contract_status_label"] = (
+            get_contract_status_label(status)
+        )
+
+        if status == "ACTIVE":
+            active_count += 1
+
+        elif status == "CANCELLED":
+            cancelled_count += 1
+            cancelled_loans.append(loan)
+
+    return render_template(
+        "loan_contracts.html",
+        loans=loans,
+        cancelled_loans=cancelled_loans,
+        active_count=active_count,
+        cancelled_count=cancelled_count,
+        total_count=len(loans),
     )
 
 @app.route("/loans/new", methods=["GET", "POST"])

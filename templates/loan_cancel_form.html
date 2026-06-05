@@ -7,7 +7,7 @@
 <body>
     <h1>契約解除登録</h1>
 
-    <p>指定した貸付IDの契約状態を CANCELLED に更新します。</p>
+    
 
     <nav>
         <ul>
@@ -21,8 +21,11 @@
             <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
             <li><a href="/customers/new">顧客登録</a></li>
             <li><a href="{{ url_for('loan_cancel') }}">契約解除登録</a></li>
+            <li><a href="{{ url_for('loan_contracts') }}">契約状態管理</a></li>
         </ul>
     </nav>
+
+    <p>指定した貸付IDの契約状態を CANCELLED に更新します。</p>
 
     {% if errors %}
         <ul>

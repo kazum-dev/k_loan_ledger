@@ -2,11 +2,11 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>貸付一覧｜K's Loan Ledger</title>
+    <title>契約状態管理 | K's Loan Ledger</title>
 </head>
 <body>
-    <h1>貸付一覧</h1>
+
+    <h1>契約状態管理</h1>
 
     <nav>
         <ul>
@@ -23,8 +23,18 @@
             <li><a href="{{ url_for('loan_contracts') }}">契約状態管理</a></li>
         </ul>
     </nav>
-    
-    <p>登録されている貸付データを一覧表示しています。</p>
+
+    <h2>契約状態サマリー</h2>
+
+    <ul>
+        <li>全貸付件数：{{ total_count }}</li>
+        <li>有効契約：{{ active_count }}</li>
+        <li>契約解除済み：{{ cancelled_count }}</li>
+    </ul>
+
+    <hr>
+
+    <h2>契約解除済み一覧</h2>
 
     <table border="1">
         <thead>
@@ -34,25 +44,53 @@
                 <th>貸付金額</th>
                 <th>貸付日</th>
                 <th>返済期日</th>
-                <th>契約状態</th>
                 <th>解除日</th>
                 <th>解除理由</th>
             </tr>
         </thead>
+
         <tbody>
-            {% for loan in loans %}
+            {% for loan in cancelled_loans %}
             <tr>
                 <td>{{ loan.loan_id }}</td>
                 <td>{{ loan.customer_id }}</td>
                 <td>{{ "{:,}".format(loan.loan_amount | int) }}</td>
                 <td>{{ loan.loan_date }}</td>
                 <td>{{ loan.due_date }}</td>
-                <td>{{ loan.contract_status }}</td>
                 <td>{{ loan.cancelled_at }}</td>
                 <td>{{ loan.cancel_reason }}</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+
+    <hr>
+
+    <h2>全貸付の契約状態一覧</h2>
+
+    <table border="1">
+        <thead>
+            <tr>
+                <th>貸付ID</th>
+                <th>顧客ID</th>
+                <th>契約状態</th>
+                <th>解除日</th>
+                <th>解除理由</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for loan in loans %}
+            <tr>
+                <td>{{ loan.loan_id }}</td>
+                <td>{{ loan.customer_id }}</td>
+                <td>{{ loan.contract_status_label }}</td>
+                <td>{{ loan.cancelled_at }}</td>
+                <td>{{ loan.cancel_reason }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
 </body>
 </html>
