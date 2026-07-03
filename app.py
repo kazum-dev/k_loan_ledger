@@ -1,8 +1,82 @@
 from flask import Flask, render_template, request, redirect, url_for
+from flask_sqlalchemy import SQLAlchemy
 import csv
 from datetime import datetime, date, timedelta
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = BASE_DIR / "data" / "loan_ledger.db"
 
 app = Flask(__name__)
+
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+db = SQLAlchemy(app)
+
+class User(db.Model):
+    __tablename__ = "users"
+
+    user_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    username = db.Column(db.String, nullable=False, unique=True)
+    created_at = db.Column(db.String, nullable=False)
+
+    customers = db.relationship("Customer", backref="user", lazy=True)
+    loans = db.relationship("Loan", backref="user", lazy=True)
+    repayments = db.relationship("Repayment", backref="user", lazy=True)
+
+
+class Customer(db.Model):
+    __tablename__ = "customers"
+
+    customer_id = db.Column(db.String, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.user_id"), nullable=False)
+    customer_name = db.Column(db.String, nullable=False)
+    credit_limit = db.Column(db.Integer, nullable=False)
+    created_at = db.Column(db.String, nullable=False)
+
+    loans = db.relationship("Loan", backref="customer", lazy=True)
+    repayments = db.relationship("Repayment", backref="customer", lazy=True)
+
+
+class Loan(db.Model):
+    __tablename__ = "loans"
+
+    loan_id = db.Column(db.String, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.user_id"), nullable=False)
+    customer_id = db.Column(db.String, db.ForeignKey("customers.customer_id"), nullable=False)
+
+    loan_amount = db.Column(db.Integer, nullable=False)
+    loan_date = db.Column(db.String, nullable=False)
+    due_date = db.Column(db.String, nullable=False)
+    interest_rate_percent = db.Column(db.Float, nullable=False)
+    repayment_expected = db.Column(db.Integer, nullable=False)
+    repayment_method = db.Column(db.String, nullable=False)
+    grace_period_days = db.Column(db.Integer, nullable=False)
+    late_fee_rate_percent = db.Column(db.Float, nullable=False)
+    late_base_amount = db.Column(db.Integer, nullable=False)
+
+    contract_status = db.Column(db.String, nullable=False)
+    cancelled_at = db.Column(db.String)
+    cancel_reason = db.Column(db.String)
+    notes = db.Column(db.String)
+    created_at = db.Column(db.String, nullable=False)
+
+    repayments = db.relationship("Repayment", backref="loan", lazy=True)
+
+
+class Repayment(db.Model):
+    __tablename__ = "repayments"
+
+    repayment_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.user_id"), nullable=False)
+    loan_id = db.Column(db.String, db.ForeignKey("loans.loan_id"), nullable=False)
+    customer_id = db.Column(db.String, db.ForeignKey("customers.customer_id"), nullable=False)
+
+    repayment_amount = db.Column(db.Integer, nullable=False)
+    repayment_date = db.Column(db.String, nullable=False)
+    payment_type = db.Column(db.String, nullable=False)
+    created_at = db.Column(db.String, nullable=False)
 
 def count_csv_rows(file_path):
     count = 0
@@ -917,4 +991,8 @@ def loan_new():
     )
 
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()
+        print("SQLAlchemyでテーブルを作成しました。")
+
     app.run(debug=True)
