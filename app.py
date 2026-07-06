@@ -1,6 +1,5 @@
 from flask import Flask, render_template, request, redirect, url_for
 from flask_sqlalchemy import SQLAlchemy
-import csv
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
@@ -78,38 +77,79 @@ class Repayment(db.Model):
     payment_type = db.Column(db.String, nullable=False)
     created_at = db.Column(db.String, nullable=False)
 
-def count_csv_rows(file_path):
-    count = 0
-    with open(file_path, "r", encoding= "utf-8") as file:
-        reader = csv.reader(file)
-        next(reader)
-        for row in  reader:
-            count += 1
-    return count
+DEFAULT_USER_ID = 1
 
-def load_loans(file_path):
-    loans = []
-    with open(file_path, "r", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            loans.append(row)
-    return loans    
 
-def load_repayments(file_path):
-    repayments = []
-    with open(file_path, "r", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            repayments.append(row)
-    return repayments
+def now_str():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-def load_customers(file_path):
-    customers = []
-    with open(file_path, "r", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            customers.append(row)
-    return customers
+
+def ensure_default_user():
+    user = db.session.get(User, DEFAULT_USER_ID)
+
+    if user is None:
+        user = User(
+            user_id=DEFAULT_USER_ID,
+            username="default_user",
+            created_at=now_str()
+        )
+        db.session.add(user)
+        db.session.commit()
+
+def load_loans(file_path=None):
+    loans = Loan.query.order_by(Loan.loan_date, Loan.loan_id).all()
+
+    return [
+        {
+            "loan_id": loan.loan_id,
+            "customer_id": loan.customer_id,
+            "loan_amount": loan.loan_amount,
+            "loan_date": loan.loan_date,
+            "due_date": loan.due_date,
+            "interest_rate_percent": loan.interest_rate_percent,
+            "repayment_expected": loan.repayment_expected,
+            "repayment_method": loan.repayment_method,
+            "grace_period_days": loan.grace_period_days,
+            "late_fee_rate_percent": loan.late_fee_rate_percent,
+            "late_base_amount": loan.late_base_amount,
+            "contract_status": loan.contract_status,
+            "cancelled_at": loan.cancelled_at or "",
+            "cancel_reason": loan.cancel_reason or "",
+            "notes": loan.notes or "",
+        }
+        for loan in loans
+    ]
+
+
+def load_repayments(file_path=None):
+    repayments = Repayment.query.order_by(
+        Repayment.repayment_date,
+        Repayment.repayment_id
+    ).all()
+
+    return [
+        {
+            "loan_id": repayment.loan_id,
+            "customer_id": repayment.customer_id,
+            "repayment_amount": repayment.repayment_amount,
+            "repayment_date": repayment.repayment_date,
+            "payment_type": repayment.payment_type,
+        }
+        for repayment in repayments
+    ]
+
+
+def load_customers(file_path=None):
+    customers = Customer.query.order_by(Customer.customer_id).all()
+
+    return [
+        {
+            "customer_id": customer.customer_id,
+            "customer_name": customer.customer_name,
+            "credit_limit": customer.credit_limit,
+        }
+        for customer in customers
+    ]
 
 def calculate_total_repaid_map(repayments):
     """
@@ -317,88 +357,75 @@ def generate_loan_id(loans, loan_date):
     return f"{prefix}-{next_number:03d}"
 
 def save_loan_to_csv(file_path, loan_data):
-    fieldnames = [
-        "loan_id",
-        "customer_id",
-        "loan_amount",
-        "loan_date",
-        "due_date",
-        "interest_rate_percent",
-        "repayment_expected",
-        "repayment_method",
-        "grace_period_days",
-        "late_fee_rate_percent",
-        "late_base_amount",
-        "contract_status",
-        "cancelled_at",
-        "cancel_reason",
-        "notes",
-    ]
+    ensure_default_user()
 
-    with open(file_path, "a", encoding="utf-8", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-        writer.writerow(loan_data)
+    loan = Loan(
+        loan_id=loan_data["loan_id"],
+        user_id=DEFAULT_USER_ID,
+        customer_id=loan_data["customer_id"],
+        loan_amount=int(loan_data["loan_amount"]),
+        loan_date=loan_data["loan_date"],
+        due_date=loan_data["due_date"],
+        interest_rate_percent=float(loan_data["interest_rate_percent"]),
+        repayment_expected=int(loan_data["repayment_expected"]),
+        repayment_method=loan_data["repayment_method"],
+        grace_period_days=int(loan_data["grace_period_days"]),
+        late_fee_rate_percent=float(loan_data["late_fee_rate_percent"]),
+        late_base_amount=int(loan_data["late_base_amount"]),
+        contract_status=loan_data["contract_status"],
+        cancelled_at=loan_data.get("cancelled_at") or None,
+        cancel_reason=loan_data.get("cancel_reason") or None,
+        notes=loan_data.get("notes") or None,
+        created_at=now_str(),
+    )
+
+    db.session.add(loan)
+    db.session.commit()
+
 
 def save_repayment_to_csv(file_path, repayment_data):
-    fieldnames = [
-        "loan_id",
-        "customer_id",
-        "repayment_amount",
-        "repayment_date",
-        "payment_type",
-    ]
+    ensure_default_user()
 
-    with open(file_path, "a", encoding="utf-8", newline="") as file:
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-        writer.writerow(repayment_data)
+    repayment = Repayment(
+        user_id=DEFAULT_USER_ID,
+        loan_id=repayment_data["loan_id"],
+        customer_id=repayment_data["customer_id"],
+        repayment_amount=int(repayment_data["repayment_amount"]),
+        repayment_date=repayment_data["repayment_date"],
+        payment_type=repayment_data["payment_type"],
+        created_at=now_str(),
+    )
+
+    db.session.add(repayment)
+    db.session.commit()
+
 
 def save_customer_to_csv(file_path, customer_data):
-    with open(file_path, "a", encoding="utf-8", newline="") as file:
-        fieldnames = ["customer_id", "customer_name", "credit_limit"]
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-        writer.writerow(customer_data)
+    ensure_default_user()
+
+    customer = Customer(
+        customer_id=customer_data["customer_id"],
+        user_id=DEFAULT_USER_ID,
+        customer_name=customer_data["customer_name"],
+        credit_limit=int(customer_data["credit_limit"]),
+        created_at=now_str(),
+    )
+
+    db.session.add(customer)
+    db.session.commit()
 
 def update_loan_cancel_status(file_path, target_loan_id, cancel_reason):
-    """
-    指定した loan_id の契約状態を CANCELLED に更新する
-    """
-    loans = load_loans(file_path)
-    updated = False
-    today_str = date.today().strftime("%Y-%m-%d")
+    loan = db.session.get(Loan, target_loan_id)
 
-    fieldnames = [
-        "loan_id",
-        "customer_id",
-        "loan_amount",
-        "loan_date",
-        "due_date",
-        "interest_rate_percent",
-        "repayment_expected",
-        "repayment_method",
-        "grace_period_days",
-        "late_fee_rate_percent",
-        "late_base_amount",
-        "contract_status",
-        "cancelled_at",
-        "cancel_reason",
-        "notes",
-    ]
+    if loan is None:
+        return False
 
-    for loan in loans:
-        if loan.get("loan_id", "").strip() == target_loan_id:
-            loan["contract_status"] = "CANCELLED"
-            loan["cancelled_at"] = today_str
-            loan["cancel_reason"] = cancel_reason
-            updated = True
-            break
+    loan.contract_status = "CANCELLED"
+    loan.cancelled_at = date.today().strftime("%Y-%m-%d")
+    loan.cancel_reason = cancel_reason
 
-    if updated:
-        with open(file_path, "w", encoding="utf-8", newline="") as file:
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(loans)
-
-    return updated
+    db.session.commit()
+    return True
 
 def get_contract_status_label(contract_status):
     """
@@ -415,10 +442,10 @@ def get_contract_status_label(contract_status):
 
 @app.route("/")
 def home():
-    customer_count = count_csv_rows("data/customers.csv")
-    loan_count = count_csv_rows("data/loan_v3.csv")
-    repayment_count = count_csv_rows("data/repayments.csv")
-    
+    customer_count = Customer.query.count()
+    loan_count = Loan.query.count()
+    repayment_count = Repayment.query.count()
+
     return render_template(
         "index.html",
         customer_count=customer_count,
@@ -993,6 +1020,7 @@ def loan_new():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
+        ensure_default_user()
         print("SQLAlchemyでテーブルを作成しました。")
 
     app.run(debug=True)
