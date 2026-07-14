@@ -1,13 +1,29 @@
-from flask import Flask, render_template, request, redirect, url_for
-from flask_sqlalchemy import SQLAlchemy
+# app.py
+import os
 from datetime import datetime, date, timedelta
 from pathlib import Path
+
+from flask import (
+    Flask,
+    g,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import check_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = BASE_DIR / "data" / "loan_ledger.db"
 
 app = Flask(__name__)
 
+app.config["SECRET_KEY"] = os.environ.get(
+    "SECRET_KEY",
+    "development-secret-key-change-before-production",
+)
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -16,14 +32,54 @@ db = SQLAlchemy(app)
 class User(db.Model):
     __tablename__ = "users"
 
-    user_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    username = db.Column(db.String, nullable=False, unique=True)
-    created_at = db.Column(db.String, nullable=False)
+    user_id = db.Column(
+        db.Integer,
+        primary_key=True,
+        autoincrement=True,
+    )
+    username = db.Column(
+        db.String(50),
+        nullable=False,
+        unique=True,
+    )
+    password_hash = db.Column(
+        db.String(255),
+        nullable=False,
+    )
+    role = db.Column(
+        db.String(20),
+        nullable=False,
+        default="USER",
+    )
+    is_active = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=True,
+    )
+    created_at = db.Column(
+        db.String,
+        nullable=False,
+    )
+    updated_at = db.Column(
+        db.String,
+        nullable=False,
+    )
 
-    customers = db.relationship("Customer", backref="user", lazy=True)
-    loans = db.relationship("Loan", backref="user", lazy=True)
-    repayments = db.relationship("Repayment", backref="user", lazy=True)
-
+    customers = db.relationship(
+        "Customer",
+        backref="user",
+        lazy=True,
+    )
+    loans = db.relationship(
+        "Loan",
+        backref="user",
+        lazy=True,
+    )
+    repayments = db.relationship(
+        "Repayment",
+        backref="user",
+        lazy=True,
+    )
 
 class Customer(db.Model):
     __tablename__ = "customers"
@@ -77,27 +133,56 @@ class Repayment(db.Model):
     payment_type = db.Column(db.String, nullable=False)
     created_at = db.Column(db.String, nullable=False)
 
-DEFAULT_USER_ID = 1
-
 
 def now_str():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+@app.before_request
+def load_logged_in_user():
+    """
+    sessionのuser_idから現在のログインユーザーを取得する。
+    """
+    user_id = session.get("user_id")
 
+    if user_id is None:
+        g.user = None
+        return
 
-def ensure_default_user():
-    user = db.session.get(User, DEFAULT_USER_ID)
+    user = db.session.get(User, user_id)
 
-    if user is None:
-        user = User(
-            user_id=DEFAULT_USER_ID,
-            username="default_user",
-            created_at=now_str()
-        )
-        db.session.add(user)
-        db.session.commit()
+    if user is None or not user.is_active:
+        session.clear()
+        g.user = None
+        return
+
+    g.user = user
+
+@app.before_request
+def require_login():
+    """
+    loginとstatic以外のページをログイン必須にする。
+    """
+    public_endpoints = {
+        "login",
+        "static",
+    }
+
+    if request.endpoint in public_endpoints:
+        return
+
+    if g.user is None:
+        return redirect(url_for("login"))
 
 def load_loans(file_path=None):
-    loans = Loan.query.order_by(Loan.loan_date, Loan.loan_id).all()
+    loans = (
+        Loan.query
+        .filter_by(user_id=g.user.user_id)
+        .order_by(
+            Loan.loan_date,
+            Loan.loan_id,
+        )
+        .all()
+    )
 
     return [
         {
@@ -120,12 +205,16 @@ def load_loans(file_path=None):
         for loan in loans
     ]
 
-
 def load_repayments(file_path=None):
-    repayments = Repayment.query.order_by(
-        Repayment.repayment_date,
-        Repayment.repayment_id
-    ).all()
+    repayments = (
+        Repayment.query
+        .filter_by(user_id=g.user.user_id)
+        .order_by(
+            Repayment.repayment_date,
+            Repayment.repayment_id,
+        )
+        .all()
+    )
 
     return [
         {
@@ -138,9 +227,13 @@ def load_repayments(file_path=None):
         for repayment in repayments
     ]
 
-
 def load_customers(file_path=None):
-    customers = Customer.query.order_by(Customer.customer_id).all()
+    customers = (
+        Customer.query
+        .filter_by(user_id=g.user.user_id)
+        .order_by(Customer.customer_id)
+        .all()
+    )
 
     return [
         {
@@ -357,21 +450,29 @@ def generate_loan_id(loans, loan_date):
     return f"{prefix}-{next_number:03d}"
 
 def save_loan_to_csv(file_path, loan_data):
-    ensure_default_user()
-
     loan = Loan(
         loan_id=loan_data["loan_id"],
-        user_id=DEFAULT_USER_ID,
+        user_id=g.user.user_id,
         customer_id=loan_data["customer_id"],
         loan_amount=int(loan_data["loan_amount"]),
         loan_date=loan_data["loan_date"],
         due_date=loan_data["due_date"],
-        interest_rate_percent=float(loan_data["interest_rate_percent"]),
-        repayment_expected=int(loan_data["repayment_expected"]),
+        interest_rate_percent=float(
+            loan_data["interest_rate_percent"]
+        ),
+        repayment_expected=int(
+            loan_data["repayment_expected"]
+        ),
         repayment_method=loan_data["repayment_method"],
-        grace_period_days=int(loan_data["grace_period_days"]),
-        late_fee_rate_percent=float(loan_data["late_fee_rate_percent"]),
-        late_base_amount=int(loan_data["late_base_amount"]),
+        grace_period_days=int(
+            loan_data["grace_period_days"]
+        ),
+        late_fee_rate_percent=float(
+            loan_data["late_fee_rate_percent"]
+        ),
+        late_base_amount=int(
+            loan_data["late_base_amount"]
+        ),
         contract_status=loan_data["contract_status"],
         cancelled_at=loan_data.get("cancelled_at") or None,
         cancel_reason=loan_data.get("cancel_reason") or None,
@@ -382,15 +483,14 @@ def save_loan_to_csv(file_path, loan_data):
     db.session.add(loan)
     db.session.commit()
 
-
 def save_repayment_to_csv(file_path, repayment_data):
-    ensure_default_user()
-
     repayment = Repayment(
-        user_id=DEFAULT_USER_ID,
+        user_id=g.user.user_id,
         loan_id=repayment_data["loan_id"],
         customer_id=repayment_data["customer_id"],
-        repayment_amount=int(repayment_data["repayment_amount"]),
+        repayment_amount=int(
+            repayment_data["repayment_amount"]
+        ),
         repayment_date=repayment_data["repayment_date"],
         payment_type=repayment_data["payment_type"],
         created_at=now_str(),
@@ -399,13 +499,10 @@ def save_repayment_to_csv(file_path, repayment_data):
     db.session.add(repayment)
     db.session.commit()
 
-
 def save_customer_to_csv(file_path, customer_data):
-    ensure_default_user()
-
     customer = Customer(
         customer_id=customer_data["customer_id"],
-        user_id=DEFAULT_USER_ID,
+        user_id=g.user.user_id,
         customer_name=customer_data["customer_name"],
         credit_limit=int(customer_data["credit_limit"]),
         created_at=now_str(),
@@ -414,8 +511,15 @@ def save_customer_to_csv(file_path, customer_data):
     db.session.add(customer)
     db.session.commit()
 
-def update_loan_cancel_status(file_path, target_loan_id, cancel_reason):
-    loan = db.session.get(Loan, target_loan_id)
+def update_loan_cancel_status(
+    file_path,
+    target_loan_id,
+    cancel_reason,
+):
+    loan = Loan.query.filter_by(
+        loan_id=target_loan_id,
+        user_id=g.user.user_id,
+    ).first()
 
     if loan is None:
         return False
@@ -440,17 +544,69 @@ def get_contract_status_label(contract_status):
 
     return labels.get(status, "不明")
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    username = ""
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+
+        user = User.query.filter_by(
+            username=username
+        ).first()
+
+        authentication_failed = (
+            user is None
+            or not user.is_active
+            or not check_password_hash(
+                user.password_hash,
+                password,
+            )
+        )
+
+        if authentication_failed:
+            error = (
+                "ユーザー名またはパスワードが"
+                "正しくありません。"
+            )
+        else:
+            session.clear()
+            session["user_id"] = user.user_id
+
+            return redirect(url_for("home"))
+
+    return render_template(
+        "login.html",
+        error=error,
+        username=username,
+    )
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
 @app.route("/")
 def home():
-    customer_count = Customer.query.count()
-    loan_count = Loan.query.count()
-    repayment_count = Repayment.query.count()
+    customer_count = Customer.query.filter_by(
+        user_id=g.user.user_id
+    ).count()
+
+    loan_count = Loan.query.filter_by(
+        user_id=g.user.user_id
+    ).count()
+
+    repayment_count = Repayment.query.filter_by(
+        user_id=g.user.user_id
+    ).count()
 
     return render_template(
         "index.html",
         customer_count=customer_count,
         loan_count=loan_count,
-        repayment_count=repayment_count
+        repayment_count=repayment_count,
     )
 
 @app.route("/loans")
@@ -704,11 +860,12 @@ def new_customer():
             except ValueError:
                 errors.append("貸付上限額は数値で入力してください。")
 
-        customers = load_customers("data/customers.csv")
-        for customer in customers:
-            if customer["customer_id"] == customer_id:
-                errors.append("この顧客IDはすでに登録されています。")
-                break
+        existing_customer = Customer.query.filter_by(
+            customer_id=customer_id
+        ).first()
+
+        if existing_customer is not None:
+            errors.append("この顧客IDは使用できません。")
 
         if not errors:
             customer_data = {
@@ -899,7 +1056,6 @@ def loan_contracts():
 def loan_new():
     if request.method == "POST":
         loans = load_loans("data/loan_v3.csv")
-        customers = load_customers("data/customers.csv")
 
         errors = []
 
@@ -915,11 +1071,17 @@ def loan_new():
             "notes": request.form.get("notes", "").strip(),
         }
 
-        customer_ids = [customer.get("customer_id", "").strip() for customer in customers]
+        customer = None
 
         if not form_data["customer_id"]:
             errors.append("顧客IDを入力してください。")
-        elif form_data["customer_id"] not in customer_ids:
+        else:
+            customer = Customer.query.filter_by(
+                customer_id=form_data["customer_id"],
+                user_id=g.user.user_id,
+        ).first()
+
+        if customer is None:
             errors.append("存在しない顧客IDです。")
 
         if not form_data["loan_amount"]:
@@ -1020,7 +1182,6 @@ def loan_new():
 if __name__ == "__main__":
     with app.app_context():
         db.create_all()
-        ensure_default_user()
         print("SQLAlchemyでテーブルを作成しました。")
 
     app.run(debug=True)

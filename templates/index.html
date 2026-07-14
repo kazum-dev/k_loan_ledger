@@ -24,6 +24,22 @@
         </ul>
     </nav>
 
+    {% if g.user %}
+        <p>
+            ログイン中：
+            {{ g.user.username }}
+        </p>
+
+        <form
+            method="POST"
+            action="{{ url_for('logout') }}"
+        >
+            <button type="submit">
+                ログアウト
+            </button>
+        </form>
+    {% endif %}
+
     <p>貸付・返済・顧客を管理するアプリです。</p>
 
     <h2>アプリ概要</h2>
