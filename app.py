@@ -609,6 +609,56 @@ def home():
         repayment_count=repayment_count,
     )
 
+@app.route("/dashboard")
+def dashboard():
+    loans = load_loans()
+    repayments = load_repayments()
+
+    # 総貸付額
+    total_loan_amount = sum(
+        loan["loan_amount"]
+        for loan in loans
+    )
+
+    # 総返済額
+    # 通常返済（REPAYMENT）のみ集計
+    total_repaid = sum(
+        repayment["repayment_amount"]
+        for repayment in repayments
+        if repayment["payment_type"].strip().upper() == "REPAYMENT"
+    )
+
+    # 未返済情報を作成
+    unpaid_loans = build_unpaid_loan_rows(
+        loans,
+        repayments,
+    )
+
+    # 未返済残高
+    total_remaining = sum(
+        loan["remaining"]
+        for loan in unpaid_loans
+    )
+
+    # 延滞件数
+    overdue_count = sum(
+        1
+        for loan in unpaid_loans
+        if loan["status"] == "OVERDUE"
+    )
+
+    dashboard_data = {
+        "total_loan_amount": total_loan_amount,
+        "total_repaid": total_repaid,
+        "total_remaining": total_remaining,
+        "overdue_count": overdue_count,
+    }
+
+    return render_template(
+        "dashboard.html",
+        dashboard_data=dashboard_data,
+    )
+
 @app.route("/loans")
 def loan_list():
     loans = load_loans("data/loan_v3.csv")

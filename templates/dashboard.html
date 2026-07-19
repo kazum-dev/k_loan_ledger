@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ダッシュボード | K's Loan Ledger</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>ダッシュボード</h1>
+
+    <nav>
+        <a href="{{ url_for('home') }}">トップページへ戻る</a>
+    </nav>
+
+    <h2>KPI</h2>
+
+    <div>
+        <h3>総貸付額</h3>
+        <p>
+            {{ "{:,}".format(dashboard_data.total_loan_amount) }} 円
+        </p>
+    </div>
+
+    <div>
+        <h3>総返済額</h3>
+        <p>
+            {{ "{:,}".format(dashboard_data.total_repaid) }} 円
+        </p>
+    </div>
+
+    <div>
+        <h3>未返済残高</h3>
+        <p>
+            {{ "{:,}".format(dashboard_data.total_remaining) }} 円
+        </p>
+    </div>
+
+    <div>
+        <h3>延滞件数</h3>
+        <p>
+            {{ dashboard_data.overdue_count }} 件
+        </p>
+    </div>
+
+    <h2>貸付・返済・未返済状況</h2>
+
+    <div style="max-width: 800px;">
+        <canvas id="loanChart"></canvas>
+    </div>
+
+    <script>
+        const dashboardData = {{ dashboard_data | tojson }};
+
+        const ctx = document.getElementById("loanChart");
+
+        new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: [
+                    "総貸付額",
+                    "総返済額",
+                    "未返済残高"
+                ],
+                datasets: [
+                    {
+                        label: "金額（円）",
+                        data: [
+                            dashboardData.total_loan_amount,
+                            dashboardData.total_repaid,
+                            dashboardData.total_remaining
+                        ]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>
