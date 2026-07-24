@@ -20,3 +20,16 @@ data/backup/
 structure.txt
 tree.txt
 
+# 環境変数・秘密情報
+.env
+.env.*
+!.env.example
+
+# バックアップファイル
+*.bak
+*.bak_*
+*.bak*
+
+# デプロイ検証用仮想環境
+.venv_deploy_test/
+

@@ -16,7 +16,11 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import check_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "data" / "loan_ledger.db"
+
+DATA_DIR = BASE_DIR / "data"
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+DB_PATH = DATA_DIR / "loan_ledger.db"
 
 app = Flask(__name__)
 
