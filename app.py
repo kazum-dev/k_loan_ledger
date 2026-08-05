@@ -17,7 +17,12 @@ from werkzeug.security import check_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
 
-DATA_DIR = BASE_DIR / "data"
+DATA_DIR = Path(
+    os.environ.get(
+        "DATA_DIR",
+        str(BASE_DIR / "data"),
+    )
+)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = DATA_DIR / "loan_ledger.db"
