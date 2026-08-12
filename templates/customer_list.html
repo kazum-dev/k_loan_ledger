@@ -39,7 +39,7 @@
             <tr>
                 <td>{{ customer.customer_id }}</td>
                 <td>{{ customer.customer_name }}</td>
-                <td>{{ "{:,}".format(customer.credit_limit | int) }}</td>
+                <td>{{ "{:,}".format(customer.credit_limit | int) }} 円</td>
             </tr>
             {% endfor %}
         </tbody>
