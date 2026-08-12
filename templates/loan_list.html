@@ -18,7 +18,7 @@
             <li><a href="{{ url_for('overdue_loans') }}">延滞貸付一覧</a></li>
             <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
             <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
-            <li><a href="/customers/new">顧客登録</a></li>
+            <li><a href="{{ url_for('new_customer') }}">顧客登録</a></li>
             <li><a href="{{ url_for('loan_cancel') }}">契約解除登録</a></li>
             <li><a href="{{ url_for('loan_contracts') }}">契約状態管理</a></li>
         </ul>
@@ -44,10 +44,18 @@
             <tr>
                 <td>{{ loan.loan_id }}</td>
                 <td>{{ loan.customer_id }}</td>
-                <td>{{ "{:,}".format(loan.loan_amount | int) }}</td>
+                <td>{{ "{:,}".format(loan.loan_amount | int) }} 円</td>
                 <td>{{ loan.loan_date }}</td>
                 <td>{{ loan.due_date }}</td>
-                <td>{{ loan.contract_status }}</td>
+                <td>
+                    {% if loan.contract_status == "ACTIVE" %}
+                        有効
+                    {% elif loan.contract_status == "CANCELLED" %}
+                        契約解除済み
+                    {% else %}
+                        不明
+                    {% endif %}
+                </td>
                 <td>{{ loan.cancelled_at }}</td>
                 <td>{{ loan.cancel_reason }}</td>
             </tr>

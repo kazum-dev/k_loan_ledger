@@ -13,6 +13,7 @@ from flask import (
     url_for,
 )
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -159,6 +160,17 @@ class Repayment(db.Model):
 
 def now_str():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def commit_db_changes():
+    """
+    DB変更をcommitする。
+    失敗した場合はrollbackして例外を上位へ伝える。
+    """
+    try:
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        raise
     
 @app.before_request
 def load_logged_in_user():
@@ -470,7 +482,16 @@ def generate_loan_id(loans, loan_date):
                 continue
 
     next_number = max(same_day_numbers, default=0) + 1
-    return f"{prefix}-{next_number:03d}"
+
+    while True:
+        loan_id = f"{prefix}-{next_number:03d}"
+
+        existing_loan = db.session.get(Loan, loan_id)
+
+        if existing_loan is None:
+            return loan_id
+
+        next_number += 1
 
 def save_loan_to_csv(file_path, loan_data):
     loan = Loan(
@@ -504,7 +525,7 @@ def save_loan_to_csv(file_path, loan_data):
     )
 
     db.session.add(loan)
-    db.session.commit()
+    commit_db_changes()
 
 def save_repayment_to_csv(file_path, repayment_data):
     repayment = Repayment(
@@ -520,7 +541,7 @@ def save_repayment_to_csv(file_path, repayment_data):
     )
 
     db.session.add(repayment)
-    db.session.commit()
+    commit_db_changes()
 
 def save_customer_to_csv(file_path, customer_data):
     customer = Customer(
@@ -532,7 +553,7 @@ def save_customer_to_csv(file_path, customer_data):
     )
 
     db.session.add(customer)
-    db.session.commit()
+    commit_db_changes()
 
 def update_loan_cancel_status(
     file_path,
@@ -551,7 +572,7 @@ def update_loan_cancel_status(
     loan.cancelled_at = date.today().strftime("%Y-%m-%d")
     loan.cancel_reason = cancel_reason
 
-    db.session.commit()
+    commit_db_changes()
     return True
 
 def get_contract_status_label(contract_status):
@@ -566,6 +587,16 @@ def get_contract_status_label(contract_status):
     }
 
     return labels.get(status, "不明")
+
+@app.errorhandler(404)
+def not_found_error(error):
+    return "ページが見つかりません。", 404
+
+
+@app.errorhandler(500)
+def internal_server_error(error):
+    db.session.rollback()
+    return "サーバー内部でエラーが発生しました。時間をおいて再度お試しください。", 500
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -844,10 +875,21 @@ def repayment_new():
 
         else:
             try:
-                datetime.strptime(
+                repayment_date_obj = datetime.strptime(
                     form_data["repayment_date"],
                     "%Y-%m-%d"
-                )
+                ).date()
+
+                if target_loan:
+                    loan_date_obj = datetime.strptime(
+                        target_loan["loan_date"],
+                        "%Y-%m-%d"
+                    ).date()
+
+                    if repayment_date_obj < loan_date_obj:
+                        errors.append(
+                            "返済日は貸付日以降の日付を入力してください。"
+                        )
 
             except ValueError:
                 errors.append("返済日の形式が正しくありません。")
@@ -1253,8 +1295,4 @@ def loan_new():
     )
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-        print("SQLAlchemyでテーブルを作成しました。")
-
-    app.run(debug=True)
+    app.run(debug=False)

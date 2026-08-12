@@ -19,7 +19,7 @@
             <li><a href="{{ url_for('overdue_loans') }}">延滞貸付一覧</a></li>
             <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
             <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
-            <li><a href="/customers/new">顧客登録</a></li>
+            <li><a href="{{ url_for('new_customer') }}">顧客登録</a></li>
             <li><a href="{{ url_for('loan_cancel') }}">契約解除登録</a></li>
             <li><a href="{{ url_for('loan_contracts') }}">契約状態管理</a></li>
         </ul>
@@ -41,7 +41,7 @@
         </form>
     {% endif %}
 
-    <p>貸付・返済・顧客を管理するアプリです。</p>
+    <p>顧客・貸付・返済・未返済状況・契約状態を管理するアプリです。</p>
 
     <h2>アプリ概要</h2>
     <p>

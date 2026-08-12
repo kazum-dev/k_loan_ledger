@@ -18,7 +18,7 @@
             <li><a href="{{ url_for('overdue_loans') }}">延滞貸付一覧</a></li>
             <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
             <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
-            <li><a href="/customers/new">顧客登録</a></li>
+            <li><a href="{{ url_for('new_customer') }}">顧客登録</a></li>
             <li><a href="{{ url_for('loan_cancel') }}">契約解除登録</a></li>
             <li><a href="{{ url_for('loan_contracts') }}">契約状態管理</a></li>
         </ul>
@@ -65,10 +65,10 @@
                 <td>{{ "{:,}".format(loan.remaining) }}</td>
                 <td>{{ loan.status_label }}</td>
                 <td>{{ loan.overdue_days }}日</td>
-                <td>¥{{ "{:,}".format(loan.late_fee_amount) }}</td>
-                <td>¥{{ "{:,}".format(loan.late_fee_paid) }}</td>
-                <td>¥{{ "{:,}".format(loan.late_fee_remaining) }}</td>
-                <td>¥{{ "{:,}".format(loan.current_collect_amount) }}</td>
+                <td>{{ "{:,}".format(loan.late_fee_amount) }} 円</td>
+                <td>{{ "{:,}".format(loan.late_fee_paid) }} 円</td>
+                <td>{{ "{:,}".format(loan.late_fee_remaining) }} 円</td>
+                <td>{{ "{:,}".format(loan.current_collect_amount) }} 円</td>
             </tr>
             {% endfor %}
         </tbody>
