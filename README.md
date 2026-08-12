@@ -1,868 +1,439 @@
-# K’s Loan Ledger
+# K's Loan Ledger
 
-小規模事業・少人数チーム向け  
-**貸付・返済・未回収を履歴と状態で管理する業務管理ツール**
+K's Loan Ledger は、顧客ごとの貸付・返済状況を管理するためのWebアプリケーションです。
 
-K’s Loan Ledger は、Excel やスプレッドシートで属人化しがちな
-貸付・回収業務を、**履歴・状態・集計**の観点から整理・可視化するための
-業務向け管理ツールです。
+顧客情報、貸付記録、返済記録を一元管理し、未返済額や延滞状況、契約状態などを確認できます。
 
-現状：CLI（業務ロジック確立フェーズ） → 将来：Web UI + Deploy（Eシリーズ）
+Python / Flask を使用して開発し、ローカル環境では SQLite、本番環境では Neon PostgreSQL を使用しています。
 
 ---
 
-## 全体構造（1分で把握）
+## 主な機能
 
-本ツールは **CSVを正データ（Single Source of Truth）** とし、  
-CLI（main.py）からドメインロジック（modules）を経由して  
-**履歴・状態・集計を一貫して管理**する構造を採用しています。
+### ログイン認証
+
+* ユーザー名・パスワードによるログイン
+* パスワードのハッシュ化
+* セッションによるログイン状態管理
+* ログアウト
+* 未ログイン時のアクセス制御
+
+### ユーザー別データ管理
+
+* 顧客・貸付・返済データをログインユーザーごとに管理
+* 他ユーザーのデータを一覧・集計対象から分離
+
+### 顧客管理
+
+* 顧客登録
+* 顧客一覧表示
+* 顧客IDによる管理
+* 与信限度額の設定
+
+### 貸付管理
+
+* 貸付登録
+* 貸付一覧表示
+* 貸付IDの自動生成
+* 貸付金額
+* 貸付日
+* 返済期日
+* 利率
+* 返済予定額
+* 返済方法
+* 猶予日数
+* 延滞手数料率
+* 備考
+* 契約状態
+
+### 返済管理
+
+* 返済登録
+* 返済一覧表示
+* 通常返済
+* 延滞手数料支払い
+* 過剰返済の防止
+* 完済済み貸付への通常返済防止
+* 契約解除済み貸付への返済防止
+
+### 未返済・延滞管理
+
+貸付データと返済データをもとに、現在の返済状況を自動計算します。
+
+主な表示内容：
+
+* 貸付金額
+* 予定返済額
+* 返済累計
+* 未返済残額
+* 延滞日数
+* 延滞手数料
+* 延滞手数料支払済額
+* 延滞手数料残額
+* 現在回収額
+
+貸付状態は主に以下へ分類されます。
+
+* 期日内未返済
+* 延滞
+* 延滞手数料のみ未払い
+
+### 契約解除管理
+
+* 契約解除登録
+* 解除理由の記録
+* 解除日の記録
+* 契約状態一覧
+* 契約解除済み一覧
+* 契約解除済み貸付への返済防止
+
+### ダッシュボード
+
+Chart.js を使用して貸付・返済状況を可視化します。
+
+主な表示内容：
+
+* 総貸付額
+* 総返済額
+* 未返済残高
+* 延滞件数
+* 貸付・返済・未返済額
+* 契約状態内訳
+* 月別返済額
 
 ---
 
-### CSV関係図（正データ構造）
+## 技術構成
 
-```mermaid
-erDiagram
-  CUSTOMERS ||--o{ LOANS : has
-  LOANS ||--o{ REPAYMENTS : has
-  LOANS ||--o{ AUDIT_LOG : generates
+### Backend
 
-  CUSTOMERS {
-    string customer_id PK
-    string customer_name
-    int credit_limit
-  }
+* Python
+* Flask
+* Flask-SQLAlchemy
+* SQLAlchemy
+* Gunicorn
 
-  LOANS {
-    string loan_id PK
-    string customer_id FK
-    int loan_amount
-    date loan_date
-    date due_date
-    float interest_rate_percent
-    int repayment_expected
-    string repayment_method
-    int grace_period_days
-    float late_fee_rate_percent
-    int late_base_amount
-    string contract_status
-    date cancelled_at
-    string cancel_reason
-    string notes
-  }
+### Database
 
-  REPAYMENTS {
-    string loan_id FK
-    string customer_id
-    int repayment_amount
-    date repayment_date
-    string payment_type
-  }
+**ローカル環境**
 
-  AUDIT_LOG {
-    datetime ts
-    string event
-    string loan_id
-    int amount
-    string meta
-    string actor
-  }
-```
+* SQLite
 
-### データフロー（CLI → modules → CSV → 集計/表示）
-```mermaid
-flowchart LR
-  USER[User] --> CLI[main.py<br/>CLI I/O & Flow Control]
+**本番環境**
 
-  CLI --> LOAN[loan_module]
-  CLI --> BAL[balance_module]
-  CLI --> CUST[customer_module]
-  CLI --> AUD[audit]
+* PostgreSQL
+* Neon
 
-  LOAN --> LOANS_CSV[(loan_v3.csv)]
-  LOAN --> REPAY_CSV[(repayments.csv)]
-  CUST --> CUST_CSV[(customers.csv)]
-  AUD --> AUDIT_CSV[(audit_log.csv)]
+### Frontend
 
-  LOANS_CSV --> BAL
-  REPAY_CSV --> BAL
+* HTML
+* Jinja2
+* Chart.js
 
-  BAL --> OUT[残高 / 未返済 / 延滞表示]
-```
+### Deployment / Development
 
-### ユースケース（業務フロー例）
+* Git
+* GitHub
+* Render
+* Visual Studio Code
+
+---
+
+## システム構成
+
+本番環境は以下の構成で動作します。
+
 ```text
-[1] 貸付登録（CLI: モード1）
-  - loan_v3.csv に契約情報を追記
-  - loan_id を主キーとして発行
-  - audit_log.csv に操作履歴を記録
-
-[2] 返済登録（CLI: モード3）
-  - repayments.csv に返済履歴を追記（分割返済可）
-  - loan_id / customer_id の参照整合性を検証
-
-[3] 未返済・延滞判定（CLI: モード9 / 10）
-  - due_date + grace_period_days を基準に状態判定
-  - 延滞時は late_fee_rate_percent に基づき手数料算出
-
-[4] 残高・回収額表示（CLI: モード5）
-  - 予定返済額 − 返済累計 ± 延滞手数料
-  - 顧客単位・貸付単位で説明可能な形で表示
+GitHub
+   ↓
+Render
+   ↓
+Flask + Gunicorn
+   ↓
+Flask-SQLAlchemy / SQLAlchemy
+   ↓
+Neon PostgreSQL
 ```
 
----
-
-## プロダクト背景
-
-小規模事業やチーム内では、以下のような金銭管理が日常的に発生します。
-
-- 立替・貸付の発生
-- 返済予定の管理
-- 未回収・延滞の把握
-- 回収状況の共有・引き継ぎ
-
-これらを Excel やスプレッドシートで管理している場合、
-
-- 返済状況が時系列で追いづらい
-- 未回収・延滞の見落としが起きやすい
-- 管理方法が属人化し、監査性・再現性が低い
-
-といった課題が生じやすくなります。
-
-K’s Loan Ledger は、こうした業務を **「履歴」と「状態」** を軸に整理し、
-正確に把握できる状態を作ることを目的としています。
+GitHub の `main` ブランチと Render を連携し、アプリケーションをデプロイしています。
 
 ---
 
-## 想定ユーザー
+## データベース構成
 
-- 小規模事業者（経理・業務担当）・個人事業主
-- スタートアップや少人数チームのバックオフィス担当
-- 業務管理・業務改善を外注したい非エンジニア
+主に以下のテーブルを使用します。
+
+### users
+
+ユーザー情報を管理します。
+
+主な項目：
+
+* user_id
+* username
+* password_hash
+* role
+* is_active
+* created_at
+* updated_at
+
+### customers
+
+顧客情報を管理します。
+
+主な項目：
+
+* customer_id
+* user_id
+* customer_name
+* credit_limit
+* created_at
+
+### loans
+
+貸付情報を管理します。
+
+主な項目：
+
+* loan_id
+* user_id
+* customer_id
+* loan_amount
+* loan_date
+* due_date
+* interest_rate_percent
+* repayment_expected
+* repayment_method
+* grace_period_days
+* late_fee_rate_percent
+* late_base_amount
+* contract_status
+* cancelled_at
+* cancel_reason
+* notes
+* created_at
+
+### repayments
+
+返済情報を管理します。
+
+主な項目：
+
+* repayment_id
+* user_id
+* loan_id
+* customer_id
+* repayment_amount
+* repayment_date
+* payment_type
+* created_at
 
 ---
 
-## 解決する課題
+## ローカル環境と本番環境
 
-1. **未回収・延滞の見落とし**
-2. **返済・入金履歴を時系列で追えない問題**
-3. **管理手法の属人化による引き継ぎ・監査の難しさ**
+K's Loan Ledger では環境に応じて使用するデータベースを切り替えます。
 
----
+### ローカル
 
-## 主な機能（現状）
+`DATABASE_URL` が設定されていない場合は SQLite を使用します。
 
-- 貸付記録の登録・履歴表示
-- 返済記録の登録・履歴表示
-- 貸付残高の照会
-- 未返済サマリーの表示
-- 延滞貸付の抽出・表示
-- 契約解除の登録・管理
-
-※ 現時点では CLI ツールとして実装されています。
-
-## CLI 実行例（抜粋）
-### 貸付登録
-python main.py
-→ 1: 貸付記録モード を選択
-
----
-
-## Design Policy
-
-### 1. Design Philosophy（設計思想）
-
-`k_loan_ledger` は、貸付・返済・残高・監査（証跡）という業務ドメインを **CLI + CSV** で再現した小規模システムです。
-
-クラウドソーシング案件応募向けポートフォリオとして、以下を優先して設計しています。
-
-- **拡張性**：DB化・Web化（Flask等）への移行を見据え、責務と境界を固定する
-- **実務っぽさ**：起動時健全化（データ修復/検証）、ログ/監査の分離、操作証跡を残す設計を含める
-
-### 境界（責務分離）
-
-- `main.py`：CLI の I/O とフロー制御（メニュー、入力、表示、例外ハンドリング）
-- `modules/`：業務ルールと判断（ドメインロジック）
-- `data/`：永続化ストレージ（CSV）
-- CSV の読み書き・パス解決・入力補助は `utils.py` に集約し、他モジュールの依存を減らす
-
-### 起動パスの分離（軽量サマリ）
-
-`--summary` 実行は「重い import を避けて」最小依存で動作します（CSV行数のみ表示）。  
-通常起動では domain 層（modules）を読み込み、各モード機能を提供します。
-
-### ログと監査の二層化
-
-- `logger.py`：技術者向け実行ログ（デバッグ/障害解析）。`data/app.log` に INFO/ERROR を出力
-- `audit.py`：監査ログ（証跡）。操作（mode遷移/起動終了/エラー等）を `data/audit_log.csv` に記録
-
-
-### 2. Public API（main.py が依存する “窓口”）
-
-> ルール：`main.py` から呼ばれている関数は、CLIの安定動作を支える **公開契約（Public API）** として扱います。  
-> Docstring はまずこの範囲を優先して整備します。
-
-### modules/customer_module.py
-- `list_customers()`
-- `search_customer(keyword)`
-- `get_all_customer_ids()`
-- `get_credit_limit(customer_id)`
-
-### modules/loan_module.py
-- `register_loan(...)`
-- `display_loan_history(customer_id, filepath=...)`
-- `display_repayment_history(customer_id, filepath=...)`
-- `display_unpaid_loans(customer_id, filter_mode, loan_file, repayment_file, today)`
-- `register_repayment_complete(loans_file, repayments_file, loan_id, amount, repayment_date, actor)`
-- `cancel_contract(loans_file, loan_id, reason, operator)`
-
-### modules/balance_module.py
-- `display_balance(customer_id)`
-
-### modules/logger.py / modules/audit.py
-- `get_logger(name)`
-- `append_audit(action, target_type, target_id, meta, actor=...)`
-
-### modules/utils.py（横断基盤：main が直接利用）
-- `get_project_paths()`
-- `clean_header_if_quoted(path)`
-- `validate_schema(path, required_columns)`
-- `normalize_customer_id()`, `normalize_method()`, `fmt_date()`
-- `prompt_customer_id()`, `prompt_method()`, `prompt_int()`, `prompt_float()`, `prompt_date_or_today()`
-
-
-### 3. Module Responsibilities（モジュール責務定義）
-
-> モジュールは「何をするか」ではなく  
-> **“何に責任を持ち、何をやらないか”** を明確にします。
-
-### `modules/loan_module.py`（中核ドメイン）
-**責務**：貸付・返済・未返済/延滞・契約状態など、貸付ドメインの判断を担う。  
-**やること**：登録/保存、履歴取得、未返済/延滞判定、契約解除などの業務ロジック  
-**やらないこと**：CLI入出力、パス解決、ログ設定
-
-### `modules/customer_module.py`（顧客マスタ）
-**責務**：`customers.csv` を扱う（参照・検索・上限取得など）。  
-**やらないこと**：残高計算、延滞判定（他責務）
-
-### `modules/balance_module.py`（照会）
-**責務**：貸付・返済を突合し、顧客単位の残高を算出する。  
-**やらないこと**：貸付/返済の登録処理
-
-### `modules/utils.py`（共通基盤）
-**責務**：CSV I/O、パス、入力補助、正規化、スキーマ検証など横断処理。  
-**やらないこと**：ドメイン固有の判断（延滞/残高など）
-
-### `modules/logger.py`（技術ログ）
-**責務**：実行ログ（開発・運用向け）を出力する。  
-**出力先**：`data/app.log`
-
-### `modules/audit.py`（監査ログ）
-**責務**：業務操作の証跡を記録し、後追い検証・集計可能にする。  
-**出力先**：`data/audit_log.csv`
-
-
-### 4. Naming Conventions（命名規則）
-
-- PEP8 に準拠（snake_case / CapWords）
-- 関数は **動詞 + 目的語**（例：`register_loan`, `display_unpaid_loans`, `cancel_contract`）
-- 金額/日数など **単位を含める**（例：`late_fee_rate_percent`, `grace_period_days`）
-- `*_file` / `*_path` は型と意味を一致させる（文字列パスか `Path` かを揃える）
-
-
-### 5. Docstring & Comment Policy（Docstring / コメント方針）
-
-### Docstring の目的
-- **API契約（入力・出力・例外・副作用）を明文化**し、CLIからの呼び出しを安定させる
-- 将来の UI/保存先変更（CSV→DB）で破壊的変更を避ける
-
-### Docstring を必須にする対象
-**main.py から直接呼ばれる “Public API” は必須**（上の一覧）。  
-内部ヘルパーは複雑な場合のみ記述します。
-
-### コメントの目的
-- コメントは **Why（なぜ）** を書く
-- What（何をしているか）はコードで表現する
-
-### Docstring テンプレ（簡易 Google style）
-```python
-def display_unpaid_loans(customer_id: str, filter_mode: str, loan_file: str, repayment_file: str, today: date):
-    """Show unpaid loans for a customer.
-
-    Args:
-        customer_id: Normalized customer identifier.
-        filter_mode: "all" or "overdue".
-        loan_file: Path to loan CSV.
-        repayment_file: Path to repayment CSV.
-        today: Reference date used for overdue judgment.
-
-    Returns:
-        list[dict] | None: Depends on implementation (document actual behavior).
-
-    Raises:
-        ValueError: For invalid inputs (document actual behavior).
-    """
+```text
+data/loan_ledger.db
 ```
 
----
+### 本番
 
-## 非機能要件　Non-Functional Requirements (NFR)
+`DATABASE_URL` が設定されている場合は、その接続先の PostgreSQL を使用します。
 
-本プロダクト（K's Loan Ledger）は、**ローカルCLI + CSV運用**を前提とした個人向け管理ツールである。
-そのため、機能要件に加えて「データが失われない」「操作履歴を追跡できる」「誤操作に強い」ことを
-非機能要件として明確に定義する。
+本番環境では Neon PostgreSQL を使用しています。
 
----
-
-### 1. Data Durability（データ消失対策）※最優先
-
-**前提**
-- 正データ（Single Source of Truth）は `data/*.csv`
-- データ更新は原則 **追記（append）** 方式
-
-**要件**
-- CSVデータの消失・破損リスクを最小化する
-- 万一破損した場合でも、直近の正常状態へ復旧可能であること
-
-#### Backup Policy（運用ルール）
-
-- CSVへの書き込み前に、必ずバックアップを作成する
-- バックアップは repo 配下の `backup/` ディレクトリに保存する
-- バックアップは操作単位で取得し、世代管理を行う
-- `backup/` は Git 管理対象外とする
-
-**構成例**
-backup/
-├─ 2026-01-28_loan_v3.csv.bak
-├─ 2026-01-28_repayments.csv.bak
-└─ 2026-01-28_customers.csv.bak
-
-
-**世代管理**
-- 最新 N 世代（例：10世代）を保持
-- 超過分は古いものから削除
-
-**復旧手順**
-1. 破損したCSVを退避
-2. `backup/` から直近の正常バックアップを `data/` に復元
-3. アプリケーションを再実行し整合性を確認
+これにより、ローカル開発では SQLite を使用しながら、本番環境では PostgreSQL を利用できます。
 
 ---
 
-### 2. Validation & Data Integrity（バリデーション方針）
+## ローカル起動方法
 
-**目的**
-- CSVが正データである以上、不正レコードの混入を防止する
-- 特に追記運用では、1行の不整合が全体の信頼性を破壊するため、入力段階での防止を重視する
-
-#### 入力時バリデーション（CLI）
-
-- 必須項目の未入力を禁止
-- 金額は正の数のみ許可
-- 日付は ISO形式（YYYY-MM-DD）に統一
-- 列挙値（例：payment_type）は定義済みの値のみ許可
-
-#### 整合性バリデーション（参照整合性）
-
-- `repayments.csv` は `loan_id` を主キー参照として扱う
-- `loan_id` が `loan_v3.csv` に存在しない返済データは登録不可
-- `customer_id` は補助キーとして扱い、loan側の `customer_id` と一致することを検証する
-- 同一条件での二重登録を防止する
-
----
-
-### 3. Logging（操作ログ設計）
-
-**目的**
-- 操作履歴を残し、原因調査・復旧・説明可能性を確保する
-
-**前提**
-- ローカルCLI前提のためユーザー識別は行わない
-- 「いつ・何をしたか」を中心に記録する
-
-**出力先**
-- `data/app.log`（追記形式）
-
-**記録内容**
-- 実行日時（ISO形式）
-- 実行モード / 操作種別
-- 対象ID（loan_id / customer_id）
-- 変更量（例：repayment_amount）
-- 実行結果（SUCCESS / ERROR）
-- エラーメッセージ（必要最小限）
-
----
-
-### 4. Auditability（監査性・追跡可能性）
-
-**目的**
-- 任意のローンについて、発生から返済までの履歴を追跡可能とする
-
-**追跡キー**
-- `loan_id` を主キーとして扱う
-- 以下のCSVを `loan_id` で横断的に追跡可能であること
-  - `loan_v3.csv`（契約情報）
-  - `repayments.csv`（返済履歴）
-
-**期待される説明可能性**
-- 任意の `loan_id` に対し、
-  - いつ契約されたか
-  - どの返済が行われたか
-  - 現在の状態がどうなっているか
-をCSVおよびログから説明できる
-
----
-
-### 5. Security（ローカルCLI前提）
-
-**前提**
-- ネットワーク非公開
-- 単一ユーザー利用を想定
-
-**最低限の対策**
-- `data/` 配下のCSVを不要に出力・共有しない
-- ログには個人情報を過剰に記録しない（ID中心）
-- 取消・無効化などの破壊的操作には確認ステップを設ける
-
----
-
-### NFR Summary
-
-本プロダクトは、  
-**追記運用 + バックアップ + バリデーション + 操作ログ** を組み合わせることで、  
-ローカルCLI環境においてもデータの信頼性・復旧性・説明可能性を確保している。
-
-
----
-
-## 技術スタック（現状）
-
-- Python
-- CSV（データ永続化）
-- pytest（テスト）
-
----
-
-## Tech Stack Rationale（技術選定理由）
-
-本プロジェクトは「最短で業務ロジックを正しく作り、テストで保証し、段階的に拡張できる状態を作る」ことを優先しています。 
-これは、受託開発・業務ツール開発において「まず正確に動くこと」を最優先する設計判断です。
-そのため、現状は **Python / CLI / CSV** を採用し、DB・Web化は後段（Eシリーズ）で実施します。
-
-### 判断の優先順位（本プロジェクトの評価軸）
-1. **業務ロジックの正確性と検証可能性（テストで保証できること）**
-2. **開発速度と変更容易性（最短で動く形にし、改修に耐えること）**
-3. **運用コストと導入容易性（小規模環境で導入しやすいこと）**
-
----
-
-### なぜ CSV なのか（現状の永続化として）
-CSV は、現フェーズにおいて「導入が軽く、内容が可視で、ロジック検証に集中できる」永続化方式です。
-
-- **導入コストが低い**：DB セットアップ不要で、小規模環境でもすぐ運用に入れる
-- **可視性が高い**：データが人間にも読め、仕様確認やデバッグが容易（監査性にも寄与）
-- **ロジック設計に集中できる**：まずは「履歴・状態・集計」という中核価値を固めるのが目的
-
-※ データ量や利用形態の変化に応じて、Eシリーズで SQLite / SQLAlchemy へ移行する前提です。
-
----
-
-### なぜ CLI なのか（UIとしての選択）
-CLI は「UI 実装に時間を使わず、業務ロジックとデータ設計を先に固める」ための選択です。
-
-- **最短で動く業務ツールを構築できる**
-- **UI とロジックの分離を徹底しやすい**
-- **pytest によるロジック検証と相性が良い**
-
-将来的な Web UI 化を前提に、表示層に依存しない構成を優先しています。
-
----
-
-### なぜ DB 化・Web 化を後段に置くのか
-DB 化・Web 化は利便性を高めますが、現時点で実施すると  
-「業務ロジックの完成度」よりも「画面・認証・運用設計」に工数が寄りやすくなります。
-
-本プロジェクトでは以下の順序を採用しています。
-
-- **Dシリーズ（現フェーズ）**  
-  CSV / CLI により、貸付・返済・状態管理・集計ロジックを完成度高く固める
-- **Eシリーズ（次フェーズ）**  
-  Web UI・DB・認証・可視化・デプロイを追加し、Web サービスとして提供
-
----
-
-## Deploy戦略と将来ロードマップ（Eシリーズ）
-
-> ※クラウドソーシング応募では「業務ロジックが正しいこと」「改修に耐えること」を最優先で示すため、現フェーズはCLIで完成度を高めています。
-
-本プロジェクトは、クラウドソーシング案件で求められやすい
-「業務ロジックの正確性 → UI化 → 永続化 → デプロイ」の順で段階的に拡張します。
-
-現時点では **CLI + CSV** により、貸付・返済・未回収（状態判定）という中核価値を
-テストで保証できる状態を優先しています。
-（＝UIやインフラより「まず正しく動く」を先に完成させる）
-
----
-
-### なぜ今は CLI + CSV なのか（現フェーズの狙い）
-
-- **案件で一番重要な業務ロジックを最短で固められる**
-- **CSVは可視性が高く、仕様確認・デバッグ・監査に強い**
-- **pytestでロジック保証しやすく、改修に耐える**
-
----
-
-### Web化 / DB化へ進む移行トリガー
-
-以下の条件が揃った時点で、Eシリーズへ移行します。
-
-- 主要な業務ロジックが **テストで十分に保証されている**（破壊的変更が起きにくい）
-- UI要件が明確になる（例：一覧検索・入力補助・画面での確認操作が必要）
-- データ運用上の要求が出る（例：検索・集計の高速化、更新の安全性、履歴管理の強化）
-- 将来の「URLを送れば触れるデモ」を用意する段階に入る
-
----
-
-### Eシリーズ（次フェーズ）全体像
-
-Eシリーズでは「Webで触れるデモ」を最終ゴールに、次を段階的に追加します。
-
-#### E-1：FlaskでWeb UI化（まずは最小）
-- 目的：画面操作で業務フローを再現できる状態にする
-- 例：顧客選択 → 貸付登録 → 返済登録 → 未返済一覧の表示
-
-#### E-2：DB化（SQLite）
-- 目的：CSVの参照・検索・整合性をDBに寄せて運用安定性を上げる
-- 例：loan / repayment / customer をテーブル化し、参照整合性を担保
-
-#### E-3：入力・バリデーション強化
-- 目的：Web UIでの誤入力を減らし、運用ミスに強くする
-- 例：フォームバリデーション、列挙値制限、必須項目ガード
-
-#### E-4：認証（必要になった段階で）
-- 目的：デモ公開・複数利用など要件が出た場合に追加
-- 例：ログイン、セッション、権限制御（※要件に応じて設計）
-
-#### E-5：デプロイ（URLで触れるデモ）
-- 目的：採用者・発注者にURLを送れば操作して理解できる状態にする
-- 例：クラウド環境へ配置、デモデータ投入、操作ガイド整備
-
----
-
-### 最終ゴール
-
-**URLを送るだけで、発注者・採用者が実際に操作して理解できるデモ**
-（＝クラウドソーシング応募時に「触れる成果物」として提示できる状態）
-
-- デモではシードデータを同梱し、初見でも一連の業務フローを確認できる状態を目指します。
-
-> ※Eシリーズは、案件要件（必要なUI/認証/運用条件）が明確になった時点で詳細設計を確定します。
-
----
-
-## このリポジトリについて
-
-本リポジトリは、  
-業務管理ツールの設計・実装・段階的拡張のプロセスを示す
-ポートフォリオとして公開しています。
-
-
-- OS: Windows 11 / PowerShell
-
-- Python: 3.13.3
-
-- テスト: pytest（22 passed）
-
-
-
-## TL;DR（最短クイックスタート）
-
-
+### 1. リポジトリを取得
 
 ```powershell
+git clone <repository-url>
+cd k_loan_ledger
+```
 
-# 1) 取得
+### 2. 仮想環境を作成
 
-git clone <YOUR\_REPO\_URL>
+Windows PowerShell の例：
 
-cd <YOUR\_REPO\_DIR>
-
-
-
-# 2) 仮想環境
-
+```powershell
 python -m venv .venv
-
-. .\\.venv\\Scripts\\Activate.ps1
-
-
-
-# 3) 依存
-
-pip install -r requirements.txt
-
-
-
-# 4) （任意）デモデータ投入
-
-# ある場合のみ: python .\\scripts\\seed\_demo\_data.py
-
-
-
-# 5) 実行
-
-python .\\main.py
-
 ```
 
-
-
-備考: 初回で requirements.txt が無い場合は
-
-
-
-pip install pytest → pip freeze > requirements.txt で生成できます。
-
-## メニュー（python main.py 実行時）
-
-
-
-```text
-
-1: 貸付記録モード
-
-2: 貸付履歴表示モード
-
-3: 返済記録モード
-
-4: 返済履歴表示モード
-
-5: 残高照会モード
-
-9: 未返済サマリー表示（テスト用）
-
-10: 延滞貸付表示モード
-
-0: 終了
-
-```
-
-
-
-## ファイル構成（抜粋）
-
-```text
-
-<repo>/
-
-&nbsp; main.py
-
-&nbsp; modules/
-
-&nbsp;   loan\_module.py
-
-&nbsp;   ...（他のモジュール）
-
-&nbsp; scripts/
-
-&nbsp;   seed\_demo\_data.py
-
-&nbsp; data/
-
-&nbsp;   loan_v3.csv
-
-&nbsp;   repayments.csv
-
-&nbsp; tests/
-
-&nbsp;   fixtures/
-
-&nbsp;   audit\_test.py
-
-&nbsp;   c1\_loan\_smoke.py
-
-&nbsp;   c1\_utils\_smoke.py
-
-&nbsp;   check\_loans\_csv\_schema.py
-
-&nbsp;   list\_test.py
-
-&nbsp;   repay\_audit\_test.py
-
-&nbsp;   smoke\_c4.py
-
-&nbsp;   test\_balance.py
-
-&nbsp;   test\_c4.py
-
-&nbsp;   test\_c5.py
-
-&nbsp;   test\_enum\_round.py
-
-&nbsp;   test\_late\_fee.py
-
-&nbsp;   test\_overpayment.py
-
-&nbsp;   test\_seed\_flow.py
-
-&nbsp;   ...（他）
-
-&nbsp; requirements.txt
-
-```
-
-
-
-## セットアップ（詳細）
-
-
+### 3. 仮想環境を有効化
 
 ```powershell
-
-python -m venv .venv
-
-. .\\.venv\\Scripts\\Activate.ps1
-
-pip install -r requirements.txt
-
+.\.venv\Scripts\Activate.ps1
 ```
 
-
-
-実行ポリシーで怒られたら一時的に：
-
-
+### 4. 必要なパッケージをインストール
 
 ```powershell
-
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-
-. .\\.venv\\Scripts\\Activate.ps1
-
+python -m pip install -r requirements.txt
 ```
 
+### 5. 必要な環境変数を設定
 
+ローカルで初期ユーザーを作成する場合は、初期ユーザー用の環境変数を設定します。
 
-## 使い方（CLI版）
-
-基本
-
-
+例：
 
 ```powershell
-
-python .\\main.py
-
+$env:INITIAL_USERNAME="your_username"
+$env:INITIAL_PASSWORD="your_password"
+$env:INITIAL_ROLE="ADMIN"
 ```
 
-よく使う操作
-
-- 未返済サマリー（テスト用）：メニューで \[9]
-
-- 延滞のみ表示：メニューで \[10]
-
-- 返済登録：メニューで \[3] → loan\_id / 返済額 / 日付 を入力
-
-- 残高照会：メニューで \[5]
-
-将来的にサブコマンド直叩き（例：python main.py add\_loan ...）を実装したら追記予定。
-
-
-
-## テスト（pytest）
+必要に応じて `SECRET_KEY` も設定します。
 
 ```powershell
-
-pytest -q
-
-# 詳細/絞り込み
-
-pytest -q --maxfail=1 -k <keyword>
-
+$env:SECRET_KEY="your_secret_key"
 ```
 
-- 期待結果：22 passed
+実際の秘密情報はリポジトリへコミットしないでください。
 
-- 主な観点：
+### 6. データベースを初期化
 
-&nbsp;   - CSVスキーマ整合（check\_loans\_csv\_schema.py）
+```powershell
+python init_db.py
+```
 
-&nbsp;   - 延滞手数料（test\_late\_fee.py）
+SQLite のテーブルが作成され、初期ユーザー用の環境変数が設定されている場合はユーザーも作成されます。
 
-&nbsp;   - 過剰返済ガード（test\_overpayment.py）
+### 7. アプリケーションを起動
 
-&nbsp;   - 残高計算（test\_balance.py）
+```powershell
+python app.py
+```
 
-&nbsp;   - シード/スモーク（test\_seed\_flow.py, smoke\_c4.py ほか）
-
-
-
-## スクリーンショット / 出力例
-
-
-
-### 画面イメージ
-
-- メニュー画面  
-
-![Menu](docs/images/menu.png)
-
-- 未返済サマリー（メニュー \[9]）  
-
-![Unpaid Summary](docs/images/unpaid\_summary.png)
-
-- 延滞一覧（メニュー \[10]）  
-
-![Overdue List](docs/images/overdue\_list.png)
-
-
-
-### テキスト出力例
+起動後、ブラウザからローカルアプリへアクセスします。
 
 ```text
-
-\[UNPAID] loan\_id=LN-001, principal=10000, due=2025-11-15, status=OVERDUE(+3d), late\_fee=300
-
-\[UNPAID] loan\_id=LN-002, principal=8000,  due=2025-11-20, status=DUE(–2d),   late\_fee=0
-
+http://127.0.0.1:5000
 ```
 
+---
 
+## 環境変数
+
+K's Loan Ledger では主に以下の環境変数を使用します。
+
+| 環境変数               | 用途                    |
+| ------------------ | --------------------- |
+| `DATABASE_URL`     | PostgreSQL接続先。本番環境で使用 |
+| `SECRET_KEY`       | Flaskのセッション管理に使用      |
+| `INITIAL_USERNAME` | 初期ユーザー名               |
+| `INITIAL_PASSWORD` | 初期ユーザーのパスワード          |
+| `INITIAL_ROLE`     | 初期ユーザーの権限             |
+
+`INITIAL_ROLE` は以下を使用できます。
 
 ```text
-
-\[REPAYMENT ADDED] loan\_id=LN-001, amount=5000, date=2025-11-05
-
-\[REPAYMENT TOTAL] paid=5000 / expected=11000 → remaining=6000
-
+USER
+ADMIN
 ```
 
+パスワード、SECRET_KEY、DATABASE_URLなどの秘密情報そのものはREADMEやソースコードへ記載しません。
 
+---
 
-### 返済登録後の計算例
+## 本番環境
 
-
+本番環境では Render から Gunicorn を使用して Flask アプリケーションを起動します。
 
 ```text
-
-\[REPAYMENT ADDED] loan\_id=LN-001, amount=5000, date=2025-11-05
-
-\[REPAYMENT TOTAL] paid=5000 / expected=11000 → remaining=6000
-
+gunicorn app:app
 ```
 
+データベースには Neon PostgreSQL を使用します。
 
+本番環境では Render 側に必要な環境変数を設定し、秘密情報をGitHubリポジトリへ保存しない構成としています。
 
-画像版スクショは docs/images/ などに配置して README から参照。
+---
 
+## エラーハンドリング・入力チェック
 
+本番運用前の整理として、主要なDB更新処理では更新失敗時にロールバックを行う構成としています。
 
-## 運用上の注意
+また、登録フォームでは主に以下を確認します。
 
-- 保存：data/\*.csv（UTF-8）
+* 必須入力
+* 数値形式
+* 0・負数
+* 日付形式
+* 存在しないID
+* 重複ID
+* 返済可能額を超える返済
+* 貸付日より前の返済日
+* 契約解除済み貸付への返済
+* 不正な延滞手数料支払い
 
-- バックアップ推奨：data/ は .gitignore で除外し、.gitkeep でディレクトリ維持
+404 / 500 エラー発生時には、内部エラーの詳細を利用者へ直接表示しないようにしています。
 
-- 同時編集注意：Excel等で同時開きは不可（排他制御なし）
+---
 
+## セキュリティ上の注意
 
+以下の情報はGitHubリポジトリへコミットしないようにします。
+
+* データベースのパスワード
+* `DATABASE_URL`
+* `SECRET_KEY`
+* 初期ユーザーのパスワード
+* `.env` ファイル
+* その他の認証情報
+
+パスワードは平文では保存せず、ハッシュ化してデータベースへ保存します。
+
+---
+
+## 現在のステータス
+
+K's Loan Ledger は、ローカル環境での開発から本番デプロイまでの基本工程を完了しています。
+
+本番環境では以下の構成で動作確認を行っています。
+
+```text
+GitHub
+→ Render
+→ Flask / Gunicorn
+→ Neon PostgreSQL
+```
+
+ログイン、顧客登録、貸付登録、返済登録、未返済・延滞管理、契約状態管理、ダッシュボード表示までの主要機能を実装しています。
+
+---
+
+## 今後の改善
+
+今後の改善候補として、以下を検討しています。
+
+* CSS導入・UI改善
+* 共通テンプレート化
+* レスポンシブ対応
+* フォームUI改善
+* 専用エラーページ
+* ログ管理
+* 自動テスト強化
+* SQLAlchemy関連コードの整理
+* データベースマイグレーション導入
+* セキュリティ強化
+* ユーザー管理機能
+* バックアップ方針の整備
+* 本番環境の監視
+* 独自ドメイン対応
+
+---
+
+## Disclaimer
+
+本アプリケーションは、Python / Flask / SQLAlchemy / PostgreSQL などを使用したWebアプリケーション開発の学習・ポートフォリオを目的として制作しています。
