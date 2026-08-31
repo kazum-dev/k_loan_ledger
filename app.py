@@ -28,7 +28,11 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 DB_PATH = DATA_DIR / "loan_ledger.db"
 
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 DATABASE_URL = os.environ.get("DATABASE_URL")
+
+if TEST_DATABASE_URL:
+    DATABASE_URL = TEST_DATABASE_URL
 
 if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace(
