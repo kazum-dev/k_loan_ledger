@@ -726,8 +726,17 @@ def test_create_late_fee_repayment_after_late_fee_paid(
     app,
     client,
     user,
+    monkeypatch,
 ):
+    import app as app_module
     from app import Customer, Loan, Repayment, db, now_str
+
+    class FixedDate(app_module.date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 8, 31)
+
+    monkeypatch.setattr(app_module, "date", FixedDate)
 
     with app.app_context():
         customer = Customer(
