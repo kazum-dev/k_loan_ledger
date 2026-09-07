@@ -1,28 +1,12 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>未返済・延滞一覧｜K's Loan Ledger</title>
-</head>
-<body>
-    <h1>未返済・延滞一覧</h1>
+{% extends "base.html" %}
 
-    <nav>
-        <ul>
-            <li><a href="{{ url_for('home') }}">トップページ</a></li>
-            <li><a href="{{ url_for('loan_list') }}">貸付一覧</a></li>
-            <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
-            <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
-            <li><a href="{{ url_for('loan_status') }}">未返済・延滞一覧</a></li>
-            <li><a href="{{ url_for('overdue_loans') }}">延滞貸付一覧</a></li>
-            <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
-            <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
-            <li><a href="{{ url_for('new_customer') }}">顧客登録</a></li>
-            <li><a href="{{ url_for('loan_cancel') }}">契約解除登録</a></li>
-            <li><a href="{{ url_for('loan_contracts') }}">契約状態管理</a></li>
-        </ul>
-    </nav>
+{% block title %}
+未返済・延滞一覧｜K's Loan Ledger
+{% endblock %}
+
+{% block content %}
+
+    <h1>未返済・延滞一覧</h1>
 
     <p>
         未返済の貸付状況と、返済期日を過ぎた貸付の延滞状況を確認できます。
@@ -66,6 +50,7 @@
                 <th>現在回収額</th>
             </tr>
         </thead>
+
         <tbody>
             {% for loan in unpaid_loans %}
             <tr>
@@ -118,8 +103,9 @@
             {% endfor %}
         </tbody>
     </table>
+
     {% else %}
-    <p>未返済の貸付はありません。</p>
+        <p>未返済の貸付はありません。</p>
     {% endif %}
-</body>
-</html>
+
+{% endblock %}

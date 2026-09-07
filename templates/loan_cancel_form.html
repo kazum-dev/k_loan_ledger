@@ -1,36 +1,23 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <title>契約解除登録 | K's Loan Ledger</title>
-</head>
-<body>
+{% extends "base.html" %}
+
+{% block title %}
+契約解除登録 | K's Loan Ledger
+{% endblock %}
+
+{% block content %}
+
     <h1>契約解除登録</h1>
 
-    
-
-    <nav>
-        <ul>
-            <li><a href="{{ url_for('home') }}">トップページ</a></li>
-            <li><a href="{{ url_for('loan_list') }}">貸付一覧</a></li>
-            <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
-            <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
-            <li><a href="{{ url_for('loan_status') }}">未返済・延滞一覧</a></li>
-            <li><a href="{{ url_for('overdue_loans') }}">延滞貸付一覧</a></li>
-            <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
-            <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
-            <li><a href="{{ url_for('new_customer') }}">顧客登録</a></li>
-            <li><a href="{{ url_for('loan_cancel') }}">契約解除登録</a></li>
-            <li><a href="{{ url_for('loan_contracts') }}">契約状態管理</a></li>
-        </ul>
-    </nav>
-
-    <p>指定した貸付IDの契約状態を CANCELLED に更新します。</p>
+    <p>
+        指定した貸付IDの契約状態を CANCELLED に更新します。
+    </p>
 
     {% if errors %}
         <ul>
             {% for error in errors %}
-                <li style="color: red;">{{ error }}</li>
+                <li style="color: red;">
+                    {{ error }}
+                </li>
             {% endfor %}
         </ul>
     {% endif %}
@@ -38,6 +25,7 @@
     <form method="post">
         <div>
             <label for="loan_id">貸付ID</label><br>
+
             <input
                 type="text"
                 id="loan_id"
@@ -49,7 +37,10 @@
         <br>
 
         <div>
-            <label for="cancel_reason">契約解除理由</label><br>
+            <label for="cancel_reason">
+                契約解除理由
+            </label><br>
+
             <textarea
                 id="cancel_reason"
                 name="cancel_reason"
@@ -60,7 +51,9 @@
 
         <br>
 
-        <button type="submit">契約解除を登録する</button>
+        <button type="submit">
+            契約解除を登録する
+        </button>
     </form>
-</body>
-</html>
+
+{% endblock %}

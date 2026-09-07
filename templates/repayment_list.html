@@ -1,28 +1,12 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>返済一覧｜K's Loan Ledger</title>
-</head>
-<body>
-    <h1>返済一覧</h1>
+{% extends "base.html" %}
 
-    <nav>
-        <ul>
-            <li><a href="{{ url_for('home') }}">トップページ</a></li>
-            <li><a href="{{ url_for('loan_list') }}">貸付一覧</a></li>
-            <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
-            <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
-            <li><a href="{{ url_for('loan_status') }}">未返済・延滞一覧</a></li>
-            <li><a href="{{ url_for('overdue_loans') }}">延滞貸付一覧</a></li>
-            <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
-            <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
-            <li><a href="{{ url_for('new_customer') }}">顧客登録</a></li>
-            <li><a href="{{ url_for('loan_cancel') }}">契約解除登録</a></li>
-            <li><a href="{{ url_for('loan_contracts') }}">契約状態管理</a></li>
-        </ul>
-    </nav>
+{% block title %}
+返済一覧｜K's Loan Ledger
+{% endblock %}
+
+{% block content %}
+
+    <h1>返済一覧</h1>
 
     <p>登録されている返済データを一覧表示しています。</p>
 
@@ -41,20 +25,22 @@
             <tr>
                 <td>{{ repayment.loan_id }}</td>
                 <td>{{ repayment.customer_id }}</td>
-                <td>{{ "{:,}".format(repayment.repayment_amount | int) }} 円</td>
+                <td>
+                    {{ "{:,}".format(repayment.repayment_amount | int) }} 円
+                </td>
                 <td>{{ repayment.repayment_date }}</td>
                 <td>
-                {% if repayment.payment_type == "REPAYMENT" %}
-                通常返済
-                {% elif repayment.payment_type == "LATE_FEE" %}
-                延滞手数料
-                {% else %}
-                不明
-                {% endif %}
+                    {% if repayment.payment_type == "REPAYMENT" %}
+                        通常返済
+                    {% elif repayment.payment_type == "LATE_FEE" %}
+                        延滞手数料
+                    {% else %}
+                        不明
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-</body>
-</html>
+
+{% endblock %}

@@ -1,27 +1,12 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <title>貸付登録</title>
-</head>
-<body>
-    <h1>貸付登録フォーム</h1>
+{% extends "base.html" %}
 
-    <nav>
-        <ul>
-            <li><a href="{{ url_for('home') }}">トップページ</a></li>
-            <li><a href="{{ url_for('loan_list') }}">貸付一覧</a></li>
-            <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
-            <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
-            <li><a href="{{ url_for('loan_status') }}">未返済・延滞一覧</a></li>
-            <li><a href="{{ url_for('overdue_loans') }}">延滞貸付一覧</a></li>
-            <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
-            <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
-            <li><a href="{{ url_for('new_customer') }}">顧客登録</a></li>
-            <li><a href="{{ url_for('loan_cancel') }}">契約解除登録</a></li>
-            <li><a href="{{ url_for('loan_contracts') }}">契約状態管理</a></li>
-        </ul>
-    </nav>
+{% block title %}
+貸付登録
+{% endblock %}
+
+{% block content %}
+
+    <h1>貸付登録フォーム</h1>
 
     {% if errors %}
         <div style="color: red;">
@@ -37,54 +22,114 @@
     <form method="POST" novalidate>
         <p>
             <label>顧客ID：</label>
-            <input type="text" name="customer_id" value="{{ form_data.get('customer_id', '') }}" required>
+            <input
+                type="text"
+                name="customer_id"
+                value="{{ form_data.get('customer_id', '') }}"
+                required
+            >
         </p>
 
         <p>
             <label>貸付額：</label>
-            <input type="number" name="loan_amount" value="{{ form_data.get('loan_amount', '') }}" required>
+            <input
+                type="number"
+                name="loan_amount"
+                value="{{ form_data.get('loan_amount', '') }}"
+                required
+            >
         </p>
 
         <p>
             <label>貸付日：</label>
-            <input type="date" name="loan_date" value="{{ form_data.get('loan_date', '') }}" required>
+            <input
+                type="date"
+                name="loan_date"
+                value="{{ form_data.get('loan_date', '') }}"
+                required
+            >
         </p>
 
         <p>
             <label>返済期日：</label>
-            <input type="date" name="due_date" value="{{ form_data.get('due_date', '') }}" required>
+            <input
+                type="date"
+                name="due_date"
+                value="{{ form_data.get('due_date', '') }}"
+                required
+            >
         </p>
 
         <p>
             <label>通常利率（%）：</label>
-            <input type="number" step="0.1" name="interest_rate_percent" value="{{ form_data.get('interest_rate_percent', '10.0') }}" required>
+            <input
+                type="number"
+                step="0.1"
+                name="interest_rate_percent"
+                value="{{ form_data.get('interest_rate_percent', '10.0') }}"
+                required
+            >
         </p>
 
         <p>
             <label>返済方法：</label>
             <select name="repayment_method">
-                <option value="CASH" {% if form_data.get('repayment_method') == 'CASH' %}selected{% endif %}>現金</option>
-                <option value="BANK_TRANSFER" {% if form_data.get('repayment_method') == 'BANK_TRANSFER' %}selected{% endif %}>銀行振込</option>
-                <option value="UNKNOWN" {% if form_data.get('repayment_method', 'UNKNOWN') == 'UNKNOWN' %}selected{% endif %}>不明</option>
+                <option
+                    value="CASH"
+                    {% if form_data.get('repayment_method') == 'CASH' %}selected{% endif %}
+                >
+                    現金
+                </option>
+
+                <option
+                    value="BANK_TRANSFER"
+                    {% if form_data.get('repayment_method') == 'BANK_TRANSFER' %}selected{% endif %}
+                >
+                    銀行振込
+                </option>
+
+                <option
+                    value="UNKNOWN"
+                    {% if form_data.get('repayment_method', 'UNKNOWN') == 'UNKNOWN' %}selected{% endif %}
+                >
+                    不明
+                </option>
             </select>
         </p>
 
         <p>
             <label>延滞猶予日数：</label>
-            <input type="number" name="grace_period_days" value="{{ form_data.get('grace_period_days', '0') }}" required>
+            <input
+                type="number"
+                name="grace_period_days"
+                value="{{ form_data.get('grace_period_days', '0') }}"
+                required
+            >
         </p>
 
         <p>
             <label>延滞利率（%）：</label>
-            <input type="number" step="0.1" name="late_fee_rate_percent" value="{{ form_data.get('late_fee_rate_percent', '10.0') }}" required>
+            <input
+                type="number"
+                step="0.1"
+                name="late_fee_rate_percent"
+                value="{{ form_data.get('late_fee_rate_percent', '10.0') }}"
+                required
+            >
         </p>
 
         <p>
             <label>備考：</label>
-            <input type="text" name="notes" value="{{ form_data.get('notes', '') }}">
+            <input
+                type="text"
+                name="notes"
+                value="{{ form_data.get('notes', '') }}"
+            >
         </p>
 
-        <button type="submit">登録する</button>
+        <button type="submit">
+            登録する
+        </button>
     </form>
-</body>
-</html>
+
+{% endblock %}

@@ -1,32 +1,19 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <title>返済登録</title>
-</head>
-<body>
-    <h1>返済登録</h1>
+{% extends "base.html" %}
 
-    <nav>
-        <ul>
-            <li><a href="{{ url_for('home') }}">トップページ</a></li>
-            <li><a href="{{ url_for('loan_list') }}">貸付一覧</a></li>
-            <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
-            <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
-            <li><a href="{{ url_for('loan_status') }}">未返済・延滞一覧</a></li>
-            <li><a href="{{ url_for('overdue_loans') }}">延滞貸付一覧</a></li>
-            <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
-            <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
-            <li><a href="{{ url_for('new_customer') }}">顧客登録</a></li>
-            <li><a href="{{ url_for('loan_cancel') }}">契約解除登録</a></li>
-            <li><a href="{{ url_for('loan_contracts') }}">契約状態管理</a></li>
-        </ul>
-    </nav>
+{% block title %}
+返済登録
+{% endblock %}
+
+{% block content %}
+
+    <h1>返済登録</h1>
 
     {% if errors %}
         <ul>
             {% for error in errors %}
-                <li style="color: red;">{{ error }}</li>
+                <li style="color: red;">
+                    {{ error }}
+                </li>
             {% endfor %}
         </ul>
     {% endif %}
@@ -34,34 +21,57 @@
     <form method="POST">
         <div>
             <label>貸付ID</label>
-            <input type="text" name="loan_id" value="{{ form_data.get('loan_id', '') }}">
+
+            <input
+                type="text"
+                name="loan_id"
+                value="{{ form_data.get('loan_id', '') }}"
+            >
         </div>
 
         <div>
             <label>返済金額</label>
-            <input type="text" name="repayment_amount" value="{{ form_data.get('repayment_amount', '') }}">
+
+            <input
+                type="text"
+                name="repayment_amount"
+                value="{{ form_data.get('repayment_amount', '') }}"
+            >
         </div>
 
         <div>
             <label>返済日</label>
-            <input type="date" name="repayment_date" value="{{ form_data.get('repayment_date', '') }}">
+
+            <input
+                type="date"
+                name="repayment_date"
+                value="{{ form_data.get('repayment_date', '') }}"
+            >
         </div>
 
         <div>
             <label>返済種別</label>
+
             <select name="payment_type">
-                <option value="REPAYMENT"
-                    {% if form_data.get('payment_type', 'REPAYMENT') == 'REPAYMENT' %}selected{% endif %}>
+                <option
+                    value="REPAYMENT"
+                    {% if form_data.get('payment_type', 'REPAYMENT') == 'REPAYMENT' %}selected{% endif %}
+                >
                     通常返済
                 </option>
-                <option value="LATE_FEE"
-                    {% if form_data.get('payment_type') == 'LATE_FEE' %}selected{% endif %}>
+
+                <option
+                    value="LATE_FEE"
+                    {% if form_data.get('payment_type') == 'LATE_FEE' %}selected{% endif %}
+                >
                     延滞手数料返済
                 </option>
             </select>
         </div>
 
-        <button type="submit">返済を登録する</button>
+        <button type="submit">
+            返済を登録する
+        </button>
     </form>
-</body>
-</html>
+
+{% endblock %}

@@ -1,59 +1,28 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K's Loan Ledger</title>
-</head>
-<body>
-    <h1>K's Loan Ledger</h1>
+{% extends "base.html" %}
 
-    <nav>
-        <ul>
-            <li><a href="{{ url_for('home') }}">トップページ</a></li>
-            <li><a href="{{ url_for('dashboard') }}">ダッシュボード</a></li>
-            <li><a href="{{ url_for('loan_list') }}">貸付一覧</a></li>
-            <li><a href="{{ url_for('repayment_list') }}">返済一覧</a></li>
-            <li><a href="{{ url_for('customer_list') }}">顧客一覧</a></li>
-            <li><a href="{{ url_for('loan_status') }}">未返済・延滞一覧</a></li>
-            <li><a href="{{ url_for('overdue_loans') }}">延滞貸付一覧</a></li>
-            <li><a href="{{ url_for('loan_new') }}">貸付登録</a></li>
-            <li><a href="{{ url_for('repayment_new') }}">返済登録</a></li>
-            <li><a href="{{ url_for('new_customer') }}">顧客登録</a></li>
-            <li><a href="{{ url_for('loan_cancel') }}">契約解除登録</a></li>
-            <li><a href="{{ url_for('loan_contracts') }}">契約状態管理</a></li>
-        </ul>
-    </nav>
+{% block title %}
+K's Loan Ledger
+{% endblock %}
 
-    {% if g.user %}
-        <p>
-            ログイン中：
-            {{ g.user.username }}
-        </p>
+{% block content %}
 
-        <form
-            method="POST"
-            action="{{ url_for('logout') }}"
-        >
-            <button type="submit">
-                ログアウト
-            </button>
-        </form>
-    {% endif %}
-
-    <p>顧客・貸付・返済・未返済状況・契約状態を管理するアプリです。</p>
+    <p>
+        顧客・貸付・返済・未返済状況・契約状態を管理するアプリです。
+    </p>
 
     <h2>アプリ概要</h2>
+
     <p>
-       このアプリでは、顧客情報、貸付記録、返済記録を一覧で確認し、
-       管理できるようにすることを目的としています。 
+        このアプリでは、顧客情報、貸付記録、返済記録を一覧で確認し、
+        管理できるようにすることを目的としています。
     </p>
 
     <h2>データ概要</h2>
+
     <ul>
         <li>顧客数：{{ customer_count }}</li>
         <li>貸付件数：{{ loan_count }}</li>
         <li>返済件数：{{ repayment_count }}</li>
     </ul>
-</body>
-</html>
+
+{% endblock %}
