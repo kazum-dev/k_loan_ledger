@@ -9,7 +9,7 @@
     <h1>顧客登録</h1>
 
     {% if errors %}
-        <div style="color: red;">
+        <div class="message-error">
             <ul>
                 {% for error in errors %}
                     <li>{{ error }}</li>
@@ -49,7 +49,9 @@
             >
         </div>
 
-        <button type="submit">登録する</button>
+        <button type="submit" class="btn btn-primary">
+            登録する
+        </button>
     </form>
 
     <p>

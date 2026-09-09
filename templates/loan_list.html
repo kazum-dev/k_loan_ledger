@@ -10,7 +10,7 @@
 
     <p>登録されている貸付データを一覧表示しています。</p>
 
-    <table border="1">
+    <table>
         <thead>
             <tr>
                 <th>貸付ID</th>
@@ -35,9 +35,9 @@
                 <td>{{ loan.due_date }}</td>
                 <td>
                     {% if loan.contract_status == "ACTIVE" %}
-                        有効
+                        <span class="status-success">有効</span>
                     {% elif loan.contract_status == "CANCELLED" %}
-                        契約解除済み
+                        <span class="status-danger">契約解除済み</span>
                     {% else %}
                         不明
                     {% endif %}

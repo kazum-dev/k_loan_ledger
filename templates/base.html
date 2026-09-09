@@ -11,102 +11,120 @@
         {% block title %}K's Loan Ledger{% endblock %}
     </title>
 
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+
     {% block head %}{% endblock %}
 </head>
 <body>
 
     {% if g.user %}
-        <h1>K's Loan Ledger</h1>
+        <header class="site-header">
+            <div class="site-header__inner">
 
-        <nav>
-            <ul>
-                <li>
-                    <a href="{{ url_for('home') }}">
-                        トップページ
-                    </a>
-                </li>
+                <h1 class="site-title">
+                    K's Loan Ledger
+                </h1>
 
-                <li>
-                    <a href="{{ url_for('dashboard') }}">
-                        ダッシュボード
-                    </a>
-                </li>
+                <nav class="site-nav">
+                    <ul>
+                        <li>
+                            <a href="{{ url_for('home') }}">
+                                トップページ
+                            </a>
+                        </li>
 
-                <li>
-                    <a href="{{ url_for('customer_list') }}">
-                        顧客一覧
-                    </a>
-                </li>
+                        <li>
+                            <a href="{{ url_for('dashboard') }}">
+                                ダッシュボード
+                            </a>
+                        </li>
 
-                <li>
-                    <a href="{{ url_for('loan_list') }}">
-                        貸付一覧
-                    </a>
-                </li>
+                        <li>
+                            <a href="{{ url_for('customer_list') }}">
+                                顧客一覧
+                            </a>
+                        </li>
 
-                <li>
-                    <a href="{{ url_for('repayment_list') }}">
-                        返済一覧
-                    </a>
-                </li>
+                        <li>
+                            <a href="{{ url_for('loan_list') }}">
+                                貸付一覧
+                            </a>
+                        </li>
 
-                <li>
-                    <a href="{{ url_for('loan_status') }}">
-                        未返済・延滞一覧
-                    </a>
-                </li>
+                        <li>
+                            <a href="{{ url_for('repayment_list') }}">
+                                返済一覧
+                            </a>
+                        </li>
 
-                <li>
-                    <a href="{{ url_for('overdue_loans') }}">
-                        延滞貸付一覧
-                    </a>
-                </li>
+                        <li>
+                            <a href="{{ url_for('loan_status') }}">
+                                未返済・延滞一覧
+                            </a>
+                        </li>
 
-                <li>
-                    <a href="{{ url_for('loan_new') }}">
-                        貸付登録
-                    </a>
-                </li>
+                        <li>
+                            <a href="{{ url_for('overdue_loans') }}">
+                                延滞貸付一覧
+                            </a>
+                        </li>
 
-                <li>
-                    <a href="{{ url_for('repayment_new') }}">
-                        返済登録
-                    </a>
-                </li>
+                        <li>
+                            <a href="{{ url_for('loan_new') }}">
+                                貸付登録
+                            </a>
+                        </li>
 
-                <li>
-                    <a href="{{ url_for('new_customer') }}">
-                        顧客登録
-                    </a>
-                </li>
+                        <li>
+                            <a href="{{ url_for('repayment_new') }}">
+                                返済登録
+                            </a>
+                        </li>
 
-                <li>
-                    <a href="{{ url_for('loan_cancel') }}">
-                        契約解除登録
-                    </a>
-                </li>
+                        <li>
+                            <a href="{{ url_for('new_customer') }}">
+                                顧客登録
+                            </a>
+                        </li>
 
-                <li>
-                    <a href="{{ url_for('loan_contracts') }}">
-                        契約状態管理
-                    </a>
-                </li>
-            </ul>
-        </nav>
+                        <li>
+                            <a href="{{ url_for('loan_cancel') }}">
+                                契約解除登録
+                            </a>
+                        </li>
 
-        <p>
-            ログイン中：
-            {{ g.user.username }}
-        </p>
+                        <li>
+                            <a href="{{ url_for('loan_contracts') }}">
+                                契約状態管理
+                            </a>
+                        </li>
+                    </ul>
+                </nav>
 
-        <form
-            method="POST"
-            action="{{ url_for('logout') }}"
-        >
-            <button type="submit">
-                ログアウト
-            </button>
-        </form>
+                <div class="user-area">
+                    <p>
+                        ログイン中：
+                        {{ g.user.username }}
+                    </p>
+
+                    <form
+                        method="POST"
+                        action="{{ url_for('logout') }}"
+                    >
+                        <button
+                            type="submit"
+                            class="btn btn-secondary"
+                        >
+                            ログアウト
+                        </button>
+                    </form>
+                </div>
+
+            </div>
+        </header>
     {% endif %}
 
     <main>

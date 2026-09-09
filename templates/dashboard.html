@@ -10,28 +10,28 @@
 
     <h2>KPI</h2>
 
-    <div>
+    <div class="metric-card">
         <h3>総貸付額</h3>
         <p>
             {{ "{:,}".format(dashboard_data.total_loan_amount) }} 円
         </p>
     </div>
 
-    <div>
+    <div class="metric-card">
         <h3>総返済額</h3>
         <p>
             {{ "{:,}".format(dashboard_data.total_repaid) }} 円
         </p>
     </div>
 
-    <div>
+    <div class="metric-card">
         <h3>未返済残高</h3>
         <p>
             {{ "{:,}".format(dashboard_data.total_remaining) }} 円
         </p>
     </div>
 
-    <div>
+    <div class="metric-card">
         <h3>延滞件数</h3>
         <p>
             {{ dashboard_data.overdue_count }} 件
@@ -40,7 +40,7 @@
 
     <h2>貸付・返済・未返済状況</h2>
 
-    <div style="max-width: 800px;">
+    <div class="chart-container">
         <canvas id="loanChart"></canvas>
     </div>
 

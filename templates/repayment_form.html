@@ -9,13 +9,15 @@
     <h1>返済登録</h1>
 
     {% if errors %}
-        <ul>
-            {% for error in errors %}
-                <li style="color: red;">
-                    {{ error }}
-                </li>
-            {% endfor %}
-        </ul>
+        <div class="message-error">
+            <ul>
+                {% for error in errors %}
+                    <li>
+                        {{ error }}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
     {% endif %}
 
     <form method="POST">
@@ -69,7 +71,7 @@
             </select>
         </div>
 
-        <button type="submit">
+        <button type="submit" class="btn btn-primary">
             返済を登録する
         </button>
     </form>

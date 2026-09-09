@@ -1,0 +1,257 @@
+:root {
+    --color-bg: #f5f7fa;
+    --color-surface: #ffffff;
+    --color-text: #1f2937;
+    --color-text-muted: #6b7280;
+
+    --color-primary: #2563eb;
+    --color-primary-hover: #1d4ed8;
+
+    --color-success: #15803d;
+    --color-warning: #a16207;
+    --color-danger: #b91c1c;
+
+    --color-border: #d1d5db;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+
+    --space-xs: 0.5rem;
+    --space-sm: 0.75rem;
+    --space-md: 1rem;
+    --space-lg: 1.5rem;
+    --space-xl: 2rem;
+
+    --content-width: 1200px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        "Hiragino Kaku Gothic ProN",
+        "Hiragino Sans",
+        Meiryo,
+        sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+a {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+h1,
+h2,
+h3 {
+    margin-top: 0;
+    line-height: 1.3;
+}
+
+main {
+    width: min(100% - 2rem, var(--content-width));
+    margin: 0 auto;
+    padding: var(--space-xl) 0;
+}
+
+.site-header {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.site-header__inner {
+    width: min(100% - 2rem, var(--content-width));
+    margin: 0 auto;
+    padding: var(--space-md) 0;
+}
+
+.site-title {
+    margin-bottom: var(--space-md);
+    font-size: 1.5rem;
+}
+
+.site-nav ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-md);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.site-nav a {
+    display: inline-block;
+    padding: 0.25rem 0;
+}
+
+.user-area {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-md);
+    margin-top: var(--space-md);
+}
+
+.user-area p,
+.user-area form {
+    margin: 0;
+}
+
+.btn {
+    display: inline-block;
+    padding: 0.6rem 1rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    font: inherit;
+    font-weight: 600;
+    line-height: 1.2;
+    text-align: center;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: var(--color-primary);
+    color: #ffffff;
+}
+
+.btn-primary:hover {
+    background: var(--color-primary-hover);
+    text-decoration: none;
+}
+
+.btn-secondary {
+    background: var(--color-surface);
+    color: var(--color-text);
+    border-color: var(--color-border);
+}
+
+.btn-danger {
+    background: var(--color-danger);
+    color: #ffffff;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--color-surface);
+}
+
+th,
+td {
+    padding: 0.75rem;
+    border: 1px solid var(--color-border);
+    text-align: left;
+    vertical-align: top;
+}
+
+th {
+    background: #eef2f7;
+    font-weight: 700;
+}
+
+input,
+select,
+textarea,
+button {
+    font: inherit;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    max-width: 420px;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    color: var(--color-text);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 2px solid rgba(37, 99, 235, 0.25);
+    border-color: var(--color-primary);
+}
+
+label {
+    font-weight: 600;
+}
+
+form > div,
+form > p {
+    margin-bottom: var(--space-md);
+}
+
+form > div:last-child,
+form > p:last-child {
+    margin-bottom: 0;
+}
+
+.card {
+    padding: var(--space-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.summary-card,
+.metric-card {
+    padding: var(--space-lg);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+}
+
+.message-error {
+    margin-bottom: var(--space-md);
+    padding: var(--space-md);
+    border: 1px solid #fecaca;
+    border-radius: var(--radius-sm);
+    background: #fef2f2;
+    color: var(--color-danger);
+}
+
+.status-success {
+    color: var(--color-success);
+    font-weight: 700;
+}
+
+.status-warning {
+    color: var(--color-warning);
+    font-weight: 700;
+}
+
+.status-danger {
+    color: var(--color-danger);
+    font-weight: 700;
+}
+
+.chart-container {
+    max-width: 800px;
+}
+
+@media (max-width: 700px) {
+    main,
+    .site-header__inner {
+        width: min(100% - 1rem, var(--content-width));
+    }
+
+    .site-nav ul {
+        gap: var(--space-xs) var(--space-sm);
+    }
+}

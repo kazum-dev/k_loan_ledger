@@ -17,7 +17,7 @@
     </p>
 
     {% if overdue_loans %}
-    <table border="1">
+    <table>
         <thead>
             <tr>
                 <th>貸付ID</th>
@@ -48,7 +48,21 @@
                 <td>{{ "{:,}".format(loan.repayment_expected) }}</td>
                 <td>{{ "{:,}".format(loan.total_repaid) }}</td>
                 <td>{{ "{:,}".format(loan.remaining) }}</td>
-                <td>{{ loan.status_label }}</td>
+
+                <td>
+                    {% if loan.status == "OVERDUE" %}
+                        <span class="status-danger">
+                            {{ loan.status_label }}
+                        </span>
+                    {% elif loan.status == "LATE_FEE_ONLY" %}
+                        <span class="status-warning">
+                            {{ loan.status_label }}
+                        </span>
+                    {% else %}
+                        {{ loan.status_label }}
+                    {% endif %}
+                </td>
+
                 <td>{{ loan.overdue_days }}日</td>
                 <td>{{ "{:,}".format(loan.late_fee_amount) }} 円</td>
                 <td>{{ "{:,}".format(loan.late_fee_paid) }} 円</td>

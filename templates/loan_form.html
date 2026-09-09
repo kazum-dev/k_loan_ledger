@@ -9,7 +9,7 @@
     <h1>貸付登録フォーム</h1>
 
     {% if errors %}
-        <div style="color: red;">
+        <div class="message-error">
             <p>入力内容を確認してください。</p>
             <ul>
                 {% for error in errors %}
@@ -127,7 +127,7 @@
             >
         </p>
 
-        <button type="submit">
+        <button type="submit" class="btn btn-primary">
             登録する
         </button>
     </form>
