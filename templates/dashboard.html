@@ -6,83 +6,133 @@
 
 {% block content %}
 
-    <h1>ダッシュボード</h1>
+<section class="page-header">
+    <p class="page-eyebrow">
+        Dashboard
+    </p>
 
-    <h2>KPI</h2>
+    <h1>
+        ダッシュボード
+    </h1>
 
-    <div class="metric-card">
-        <h3>総貸付額</h3>
+    <p class="page-lead">
+        貸付・返済・未返済・延滞の状況を、
+        主要指標とグラフで確認できます。
+    </p>
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <h2>主要指標</h2>
+
         <p>
-            {{ "{:,}".format(dashboard_data.total_loan_amount) }} 円
+            現在の貸付状況を、重要な数値ごとに確認できます。
         </p>
     </div>
 
-    <div class="metric-card">
-        <h3>総返済額</h3>
+    <div class="dashboard-metric-grid">
+        <div class="metric-card">
+            <p class="metric-card__label">
+                総貸付額
+            </p>
+
+            <p class="metric-card__value">
+                {{ "{:,}".format(dashboard_data.total_loan_amount) }}
+                <span>円</span>
+            </p>
+        </div>
+
+        <div class="metric-card">
+            <p class="metric-card__label">
+                総返済額
+            </p>
+
+            <p class="metric-card__value">
+                {{ "{:,}".format(dashboard_data.total_repaid) }}
+                <span>円</span>
+            </p>
+        </div>
+
+        <div class="metric-card">
+            <p class="metric-card__label">
+                未返済残高
+            </p>
+
+            <p class="metric-card__value">
+                {{ "{:,}".format(dashboard_data.total_remaining) }}
+                <span>円</span>
+            </p>
+        </div>
+
+        <div class="metric-card">
+            <p class="metric-card__label">
+                延滞件数
+            </p>
+
+            <p class="metric-card__value">
+                {{ dashboard_data.overdue_count }}
+                <span>件</span>
+            </p>
+        </div>
+    </div>
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <h2>貸付・返済・未返済状況</h2>
+
         <p>
-            {{ "{:,}".format(dashboard_data.total_repaid) }} 円
+            総貸付額・総返済額・未返済残高を比較できます。
         </p>
     </div>
 
-    <div class="metric-card">
-        <h3>未返済残高</h3>
-        <p>
-            {{ "{:,}".format(dashboard_data.total_remaining) }} 円
-        </p>
+    <div class="card dashboard-chart-card">
+        <div class="chart-container">
+            <canvas id="loanChart"></canvas>
+        </div>
     </div>
-
-    <div class="metric-card">
-        <h3>延滞件数</h3>
-        <p>
-            {{ dashboard_data.overdue_count }} 件
-        </p>
-    </div>
-
-    <h2>貸付・返済・未返済状況</h2>
-
-    <div class="chart-container">
-        <canvas id="loanChart"></canvas>
-    </div>
+</section>
 
 {% endblock %}
 
 {% block scripts %}
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <script>
-        const dashboardData = {{ dashboard_data | tojson }};
+<script>
+    const dashboardData = {{ dashboard_data | tojson }};
 
-        const ctx = document.getElementById("loanChart");
+    const ctx = document.getElementById("loanChart");
 
-        new Chart(ctx, {
-            type: "bar",
-            data: {
-                labels: [
-                    "総貸付額",
-                    "総返済額",
-                    "未返済残高"
-                ],
-                datasets: [
-                    {
-                        label: "金額（円）",
-                        data: [
-                            dashboardData.total_loan_amount,
-                            dashboardData.total_repaid,
-                            dashboardData.total_remaining
-                        ]
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
+    new Chart(ctx, {
+        type: "bar",
+        data: {
+            labels: [
+                "総貸付額",
+                "総返済額",
+                "未返済残高"
+            ],
+            datasets: [
+                {
+                    label: "金額（円）",
+                    data: [
+                        dashboardData.total_loan_amount,
+                        dashboardData.total_repaid,
+                        dashboardData.total_remaining
+                    ]
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
                 }
             }
-        });
-    </script>
+        }
+    });
+</script>
 
 {% endblock %}

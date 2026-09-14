@@ -6,23 +6,150 @@ K's Loan Ledger
 
 {% block content %}
 
-    <p>
-        顧客・貸付・返済・未返済状況・契約状態を管理するアプリです。
+<section class="page-header">
+    <p class="page-eyebrow">
+        Loan Management Application
     </p>
 
-    <h2>アプリ概要</h2>
+    <h1>
+        K's Loan Ledger
+    </h1>
 
-    <p>
-        このアプリでは、顧客情報、貸付記録、返済記録を一覧で確認し、
-        管理できるようにすることを目的としています。
+    <p class="page-lead">
+        顧客・貸付・返済・未返済状況・契約状態を、
+        一元管理できる貸付管理アプリです。
     </p>
 
-    <h2>データ概要</h2>
+    <div class="action-group">
+        <a
+            href="{{ url_for('dashboard') }}"
+            class="btn btn-primary"
+        >
+            ダッシュボードを見る
+        </a>
 
-    <ul>
-        <li>顧客数：{{ customer_count }}</li>
-        <li>貸付件数：{{ loan_count }}</li>
-        <li>返済件数：{{ repayment_count }}</li>
-    </ul>
+        <a
+            href="{{ url_for('customer_list') }}"
+            class="btn btn-secondary"
+        >
+            顧客一覧を見る
+        </a>
+    </div>
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <h2>現在のデータ</h2>
+
+        <p>
+            登録されている主要データの件数を確認できます。
+        </p>
+    </div>
+
+    <div class="metric-grid">
+        <div class="metric-card">
+            <p class="metric-card__label">
+                顧客
+            </p>
+
+            <p class="metric-card__value">
+                {{ customer_count }}
+                <span>件</span>
+            </p>
+        </div>
+
+        <div class="metric-card">
+            <p class="metric-card__label">
+                貸付
+            </p>
+
+            <p class="metric-card__value">
+                {{ loan_count }}
+                <span>件</span>
+            </p>
+        </div>
+
+        <div class="metric-card">
+            <p class="metric-card__label">
+                返済
+            </p>
+
+            <p class="metric-card__value">
+                {{ repayment_count }}
+                <span>件</span>
+            </p>
+        </div>
+    </div>
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <h2>主な機能</h2>
+
+        <p>
+            貸付業務に必要な情報を、目的別に確認・登録できます。
+        </p>
+    </div>
+
+    <div class="feature-grid">
+        <div class="card feature-card">
+            <h3>顧客管理</h3>
+
+            <p>
+                顧客情報と貸付上限額を登録し、
+                顧客ごとの情報を管理します。
+            </p>
+
+            <a href="{{ url_for('customer_list') }}">
+                顧客一覧を見る
+            </a>
+        </div>
+
+        <div class="card feature-card">
+            <h3>貸付・返済管理</h3>
+
+            <p>
+                貸付記録と返済記録を登録し、
+                取引履歴を確認できます。
+            </p>
+
+            <div class="feature-links">
+                <a href="{{ url_for('loan_list') }}">
+                    貸付一覧
+                </a>
+
+                <a href="{{ url_for('repayment_list') }}">
+                    返済一覧
+                </a>
+            </div>
+        </div>
+
+        <div class="card feature-card">
+            <h3>未返済・延滞管理</h3>
+
+            <p>
+                未返済残高や返済期日、
+                延滞している貸付を確認できます。
+            </p>
+
+            <a href="{{ url_for('loan_status') }}">
+                未返済・延滞一覧を見る
+            </a>
+        </div>
+
+        <div class="card feature-card">
+            <h3>契約状態管理</h3>
+
+            <p>
+                有効な契約と解除済みの契約を確認し、
+                契約状態を管理できます。
+            </p>
+
+            <a href="{{ url_for('loan_contracts') }}">
+                契約状態を見る
+            </a>
+        </div>
+    </div>
+</section>
 
 {% endblock %}

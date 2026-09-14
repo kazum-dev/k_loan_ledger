@@ -6,56 +6,81 @@
 
 {% block content %}
 
-    <h1>契約解除登録</h1>
-
-    <p>
-        指定した貸付IDの契約状態を CANCELLED に更新します。
+<section class="page-header">
+    <p class="page-eyebrow">
+        Cancel Contract
     </p>
 
-    {% if errors %}
-        <div class="message-error">
-            <ul>
-                {% for error in errors %}
-                    <li>
-                        {{ error }}
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
-    {% endif %}
+    <h1>
+        契約解除登録
+    </h1>
 
-    <form method="post">
-        <div>
-            <label for="loan_id">貸付ID</label><br>
+    <p class="page-lead">
+        指定した貸付の契約を解除済みとして登録します。
+    </p>
 
-            <input
-                type="text"
-                id="loan_id"
-                name="loan_id"
-                value="{{ form_data.get('loan_id', '') }}"
+    <div class="action-group">
+        <a
+            href="{{ url_for('loan_contracts') }}"
+            class="btn btn-secondary"
+        >
+            契約状態管理へ戻る
+        </a>
+    </div>
+</section>
+
+<section class="section-block">
+    <div class="card form-card">
+
+        {% if errors %}
+            <div class="message-error">
+                <p>
+                    入力内容を確認してください。
+                </p>
+
+                <ul>
+                    {% for error in errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <form method="post">
+            <div>
+                <label for="loan_id">
+                    貸付ID
+                </label>
+
+                <input
+                    type="text"
+                    id="loan_id"
+                    name="loan_id"
+                    value="{{ form_data.get('loan_id', '') }}"
+                >
+            </div>
+
+            <div>
+                <label for="cancel_reason">
+                    契約解除理由
+                </label>
+
+                <textarea
+                    id="cancel_reason"
+                    name="cancel_reason"
+                    rows="4"
+                >{{ form_data.get('cancel_reason', '') }}</textarea>
+            </div>
+
+            <button
+                type="submit"
+                class="btn btn-danger"
             >
-        </div>
+                契約解除を登録
+            </button>
+        </form>
 
-        <br>
-
-        <div>
-            <label for="cancel_reason">
-                契約解除理由
-            </label><br>
-
-            <textarea
-                id="cancel_reason"
-                name="cancel_reason"
-                rows="4"
-                cols="50"
-            >{{ form_data.get('cancel_reason', '') }}</textarea>
-        </div>
-
-        <br>
-
-        <button type="submit" class="btn btn-danger">
-            契約解除を登録する
-        </button>
-    </form>
+    </div>
+</section>
 
 {% endblock %}

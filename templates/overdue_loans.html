@@ -6,75 +6,182 @@
 
 {% block content %}
 
-    <h1>延滞貸付一覧</h1>
-
-    <p>
-        延滞中、または延滞手数料のみ未払いの貸付だけを表示するページです。
+<section class="page-header">
+    <p class="page-eyebrow">
+        Overdue Loans
     </p>
 
-    <p>
-        延滞貸付件数：{{ overdue_loans|length }} 件
+    <h1>
+        延滞貸付一覧
+    </h1>
+
+    <p class="page-lead">
+        延滞中、または延滞手数料のみ未払いの貸付を確認できます。
     </p>
+
+    <div class="action-group">
+        <a
+            href="{{ url_for('loan_status') }}"
+            class="btn btn-secondary"
+        >
+            未返済・延滞一覧へ戻る
+        </a>
+
+        <a
+            href="{{ url_for('home') }}"
+            class="btn btn-secondary"
+        >
+            トップへ戻る
+        </a>
+    </div>
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <h2>延滞状況</h2>
+
+        <p>
+            対応が必要な貸付を一覧で確認できます。
+        </p>
+    </div>
+
+    <div class="summary-card overdue-count-card">
+        <p class="metric-card__label">
+            延滞貸付件数
+        </p>
+
+        <p class="metric-card__value status-danger">
+            {{ overdue_loans|length }}
+            <span>件</span>
+        </p>
+    </div>
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <h2>延滞貸付</h2>
+
+        <p>
+            返済期日・延滞日数・延滞手数料・現在回収額を確認できます。
+        </p>
+    </div>
 
     {% if overdue_loans %}
-    <table>
-        <thead>
-            <tr>
-                <th>貸付ID</th>
-                <th>顧客ID</th>
-                <th>貸付日</th>
-                <th>貸付金額</th>
-                <th>返済期日</th>
-                <th>予定返済額</th>
-                <th>返済累計</th>
-                <th>残額</th>
-                <th>状態</th>
-                <th>延滞日数</th>
-                <th>延滞手数料発生額</th>
-                <th>延滞手数料支払済</th>
-                <th>延滞手数料残額</th>
-                <th>現在回収額</th>
-            </tr>
-        </thead>
+        <div class="table-container">
+            <table class="wide-data-table">
+                <thead>
+                    <tr>
+                        <th>貸付ID</th>
+                        <th>顧客ID</th>
+                        <th>貸付日</th>
+                        <th class="table-number">貸付金額</th>
+                        <th>返済期日</th>
+                        <th class="table-number">予定返済額</th>
+                        <th class="table-number">返済累計</th>
+                        <th class="table-number">未返済残高</th>
+                        <th>状態</th>
+                        <th>延滞日数</th>
+                        <th class="table-number">延滞手数料発生額</th>
+                        <th class="table-number">延滞手数料支払済</th>
+                        <th class="table-number">延滞手数料残額</th>
+                        <th class="table-number">現在回収額</th>
+                    </tr>
+                </thead>
 
-        <tbody>
-            {% for loan in overdue_loans %}
-            <tr>
-                <td>{{ loan.loan_id }}</td>
-                <td>{{ loan.customer_id }}</td>
-                <td>{{ loan.loan_date }}</td>
-                <td>{{ "{:,}".format(loan.loan_amount) }}</td>
-                <td>{{ loan.due_date }}</td>
-                <td>{{ "{:,}".format(loan.repayment_expected) }}</td>
-                <td>{{ "{:,}".format(loan.total_repaid) }}</td>
-                <td>{{ "{:,}".format(loan.remaining) }}</td>
+                <tbody>
+                    {% for loan in overdue_loans %}
+                    <tr
+                        {% if loan.status == "OVERDUE" %}
+                            class="row-danger"
+                        {% elif loan.status == "LATE_FEE_ONLY" %}
+                            class="row-warning"
+                        {% endif %}
+                    >
+                        <td>
+                            <strong>{{ loan.loan_id }}</strong>
+                        </td>
 
-                <td>
-                    {% if loan.status == "OVERDUE" %}
-                        <span class="status-danger">
-                            {{ loan.status_label }}
-                        </span>
-                    {% elif loan.status == "LATE_FEE_ONLY" %}
-                        <span class="status-warning">
-                            {{ loan.status_label }}
-                        </span>
-                    {% else %}
-                        {{ loan.status_label }}
-                    {% endif %}
-                </td>
+                        <td>{{ loan.customer_id }}</td>
 
-                <td>{{ loan.overdue_days }}日</td>
-                <td>{{ "{:,}".format(loan.late_fee_amount) }} 円</td>
-                <td>{{ "{:,}".format(loan.late_fee_paid) }} 円</td>
-                <td>{{ "{:,}".format(loan.late_fee_remaining) }} 円</td>
-                <td>{{ "{:,}".format(loan.current_collect_amount) }} 円</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+                        <td>{{ loan.loan_date }}</td>
 
+                        <td class="table-number">
+                            {{ "{:,}".format(loan.loan_amount) }} 円
+                        </td>
+
+                        <td>
+                            <strong>{{ loan.due_date }}</strong>
+                        </td>
+
+                        <td class="table-number">
+                            {{ "{:,}".format(loan.repayment_expected) }} 円
+                        </td>
+
+                        <td class="table-number">
+                            {{ "{:,}".format(loan.total_repaid) }} 円
+                        </td>
+
+                        <td class="table-number">
+                            <strong>
+                                {{ "{:,}".format(loan.remaining) }} 円
+                            </strong>
+                        </td>
+
+                        <td>
+                            {% if loan.status == "OVERDUE" %}
+                                <span class="status-danger">
+                                    {{ loan.status_label }}
+                                </span>
+                            {% elif loan.status == "LATE_FEE_ONLY" %}
+                                <span class="status-warning">
+                                    {{ loan.status_label }}
+                                </span>
+                            {% else %}
+                                {{ loan.status_label }}
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ loan.overdue_days }} 日
+                            </strong>
+                        </td>
+
+                        <td class="table-number">
+                            {{ "{:,}".format(loan.late_fee_amount) }} 円
+                        </td>
+
+                        <td class="table-number">
+                            {{ "{:,}".format(loan.late_fee_paid) }} 円
+                        </td>
+
+                        <td class="table-number">
+                            <strong>
+                                {{ "{:,}".format(loan.late_fee_remaining) }} 円
+                            </strong>
+                        </td>
+
+                        <td class="table-number">
+                            <strong>
+                                {{ "{:,}".format(loan.current_collect_amount) }} 円
+                            </strong>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     {% else %}
-        <p>延滞中の貸付はありません。</p>
+        <div class="empty-state">
+            <h3>
+                延滞中の貸付はありません
+            </h3>
+
+            <p>
+                現在、延滞中または延滞手数料のみ未払いの貸付はありません。
+            </p>
+        </div>
     {% endif %}
+</section>
 
 {% endblock %}

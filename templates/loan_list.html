@@ -6,47 +6,156 @@
 
 {% block content %}
 
-    <h1>貸付一覧</h1>
+<section class="page-header">
+    <p class="page-eyebrow">
+        Loans
+    </p>
 
-    <p>登録されている貸付データを一覧表示しています。</p>
+    <h1>
+        貸付一覧
+    </h1>
 
-    <table>
-        <thead>
-            <tr>
-                <th>貸付ID</th>
-                <th>顧客ID</th>
-                <th>貸付金額</th>
-                <th>貸付日</th>
-                <th>返済期日</th>
-                <th>契約状態</th>
-                <th>解除日</th>
-                <th>解除理由</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for loan in loans %}
-            <tr>
-                <td>{{ loan.loan_id }}</td>
-                <td>{{ loan.customer_id }}</td>
-                <td>
-                    {{ "{:,}".format(loan.loan_amount | int) }} 円
-                </td>
-                <td>{{ loan.loan_date }}</td>
-                <td>{{ loan.due_date }}</td>
-                <td>
-                    {% if loan.contract_status == "ACTIVE" %}
-                        <span class="status-success">有効</span>
-                    {% elif loan.contract_status == "CANCELLED" %}
-                        <span class="status-danger">契約解除済み</span>
-                    {% else %}
-                        不明
-                    {% endif %}
-                </td>
-                <td>{{ loan.cancelled_at }}</td>
-                <td>{{ loan.cancel_reason }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <p class="page-lead">
+        登録されている貸付の金額・返済期日・契約状態を確認できます。
+    </p>
+
+    <div class="action-group">
+        <a
+            href="{{ url_for('loan_new') }}"
+            class="btn btn-primary"
+        >
+            貸付を新規登録
+        </a>
+
+        <a
+            href="{{ url_for('loan_status') }}"
+            class="btn btn-secondary"
+        >
+            未返済・延滞を確認
+        </a>
+
+        <a
+            href="{{ url_for('home') }}"
+            class="btn btn-secondary"
+        >
+            トップへ戻る
+        </a>
+    </div>
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <h2>
+            登録貸付
+        </h2>
+
+        <p>
+            貸付ID・顧客・金額・日付・契約状態を一覧で確認できます。
+        </p>
+    </div>
+
+    {% if loans %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>貸付ID</th>
+                        <th>顧客ID</th>
+                        <th class="table-number">
+                            貸付金額
+                        </th>
+                        <th>貸付日</th>
+                        <th>返済期日</th>
+                        <th>契約状態</th>
+                        <th>解除日</th>
+                        <th>解除理由</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for loan in loans %}
+                    <tr>
+                        <td>
+                            <strong>
+                                {{ loan.loan_id }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ loan.customer_id }}
+                        </td>
+
+                        <td class="table-number">
+                            {{ "{:,}".format(loan.loan_amount | int) }} 円
+                        </td>
+
+                        <td>
+                            {{ loan.loan_date }}
+                        </td>
+
+                        <td>
+                            {{ loan.due_date }}
+                        </td>
+
+                        <td>
+                            {% if loan.contract_status == "ACTIVE" %}
+                                <span class="status-success">
+                                    有効
+                                </span>
+                            {% elif loan.contract_status == "CANCELLED" %}
+                                <span class="status-danger">
+                                    契約解除済み
+                                </span>
+                            {% else %}
+                                <span class="status-warning">
+                                    状態不明
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if loan.cancelled_at %}
+                                {{ loan.cancelled_at }}
+                            {% else %}
+                                <span class="table-muted">
+                                    —
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if loan.cancel_reason %}
+                                {{ loan.cancel_reason }}
+                            {% else %}
+                                <span class="table-muted">
+                                    —
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>
+                登録されている貸付はありません
+            </h3>
+
+            <p>
+                貸付を登録すると、
+                ここに貸付情報が表示されます。
+            </p>
+
+            <a
+                href="{{ url_for('loan_new') }}"
+                class="btn btn-primary"
+            >
+                最初の貸付を登録
+            </a>
+        </div>
+    {% endif %}
+</section>
 
 {% endblock %}

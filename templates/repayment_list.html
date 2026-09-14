@@ -6,41 +6,129 @@
 
 {% block content %}
 
-    <h1>返済一覧</h1>
+<section class="page-header">
+    <p class="page-eyebrow">
+        Repayments
+    </p>
 
-    <p>登録されている返済データを一覧表示しています。</p>
+    <h1>
+        返済一覧
+    </h1>
 
-    <table>
-        <thead>
-            <tr>
-                <th>貸付ID</th>
-                <th>顧客ID</th>
-                <th>返済額</th>
-                <th>返済日</th>
-                <th>種別</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for repayment in repayments %}
-            <tr>
-                <td>{{ repayment.loan_id }}</td>
-                <td>{{ repayment.customer_id }}</td>
-                <td>
-                    {{ "{:,}".format(repayment.repayment_amount | int) }} 円
-                </td>
-                <td>{{ repayment.repayment_date }}</td>
-                <td>
-                    {% if repayment.payment_type == "REPAYMENT" %}
-                        通常返済
-                    {% elif repayment.payment_type == "LATE_FEE" %}
-                        延滞手数料
-                    {% else %}
-                        不明
-                    {% endif %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <p class="page-lead">
+        登録されている返済金額・返済日・返済種別を確認できます。
+    </p>
+
+    <div class="action-group">
+        <a
+            href="{{ url_for('repayment_new') }}"
+            class="btn btn-primary"
+        >
+            返済を新規登録
+        </a>
+
+        <a
+            href="{{ url_for('loan_list') }}"
+            class="btn btn-secondary"
+        >
+            貸付一覧を見る
+        </a>
+
+        <a
+            href="{{ url_for('home') }}"
+            class="btn btn-secondary"
+        >
+            トップへ戻る
+        </a>
+    </div>
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <h2>
+            登録返済
+        </h2>
+
+        <p>
+            貸付ID・顧客・返済額・返済日・返済種別を一覧で確認できます。
+        </p>
+    </div>
+
+    {% if repayments %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>貸付ID</th>
+                        <th>顧客ID</th>
+                        <th class="table-number">
+                            返済額
+                        </th>
+                        <th>返済日</th>
+                        <th>返済種別</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for repayment in repayments %}
+                    <tr>
+                        <td>
+                            <strong>
+                                {{ repayment.loan_id }}
+                            </strong>
+                        </td>
+
+                        <td>
+                            {{ repayment.customer_id }}
+                        </td>
+
+                        <td class="table-number">
+                            {{ "{:,}".format(repayment.repayment_amount | int) }} 円
+                        </td>
+
+                        <td>
+                            {{ repayment.repayment_date }}
+                        </td>
+
+                        <td>
+                            {% if repayment.payment_type == "REPAYMENT" %}
+                                <span class="status-success">
+                                    通常返済
+                                </span>
+                            {% elif repayment.payment_type == "LATE_FEE" %}
+                                <span class="status-warning">
+                                    延滞手数料
+                                </span>
+                            {% else %}
+                                <span class="status-warning">
+                                    種別不明
+                                </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>
+                登録されている返済はありません
+            </h3>
+
+            <p>
+                返済を登録すると、
+                ここに返済情報が表示されます。
+            </p>
+
+            <a
+                href="{{ url_for('repayment_new') }}"
+                class="btn btn-primary"
+            >
+                最初の返済を登録
+            </a>
+        </div>
+    {% endif %}
+</section>
 
 {% endblock %}

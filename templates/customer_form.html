@@ -1,63 +1,100 @@
 {% extends "base.html" %}
 
 {% block title %}
-顧客登録
+顧客登録 | K's Loan Ledger
 {% endblock %}
 
 {% block content %}
 
-    <h1>顧客登録</h1>
+<section class="page-header">
+    <p class="page-eyebrow">
+        New Customer
+    </p>
 
-    {% if errors %}
-        <div class="message-error">
-            <ul>
-                {% for error in errors %}
-                    <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-    {% endif %}
+    <h1>
+        顧客登録
+    </h1>
 
-    <form method="POST">
-        <div>
-            <label for="customer_id">顧客ID</label>
-            <input
-                type="text"
-                id="customer_id"
-                name="customer_id"
-                value="{{ form_data.customer_id }}"
-            >
-        </div>
+    <p class="page-lead">
+        顧客ID・顧客名・貸付上限額を登録します。
+    </p>
 
-        <div>
-            <label for="customer_name">顧客名</label>
-            <input
-                type="text"
-                id="customer_name"
-                name="customer_name"
-                value="{{ form_data.customer_name }}"
-            >
-        </div>
-
-        <div>
-            <label for="credit_limit">貸付上限額</label>
-            <input
-                type="text"
-                id="credit_limit"
-                name="credit_limit"
-                value="{{ form_data.credit_limit }}"
-            >
-        </div>
-
-        <button type="submit" class="btn btn-primary">
-            登録する
-        </button>
-    </form>
-
-    <p>
-        <a href="{{ url_for('customer_list') }}">
+    <div class="action-group">
+        <a
+            href="{{ url_for('customer_list') }}"
+            class="btn btn-secondary"
+        >
             顧客一覧へ戻る
         </a>
-    </p>
+    </div>
+</section>
+
+<section class="section-block">
+    <div class="card form-card">
+
+        {% if errors %}
+            <div class="message-error">
+                <p>
+                    入力内容を確認してください。
+                </p>
+
+                <ul>
+                    {% for error in errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <form method="POST">
+            <div>
+                <label for="customer_id">
+                    顧客ID
+                </label>
+
+                <input
+                    type="text"
+                    id="customer_id"
+                    name="customer_id"
+                    value="{{ form_data.customer_id }}"
+                >
+            </div>
+
+            <div>
+                <label for="customer_name">
+                    顧客名
+                </label>
+
+                <input
+                    type="text"
+                    id="customer_name"
+                    name="customer_name"
+                    value="{{ form_data.customer_name }}"
+                >
+            </div>
+
+            <div>
+                <label for="credit_limit">
+                    貸付上限額（円）
+                </label>
+
+                <input
+                    type="text"
+                    id="credit_limit"
+                    name="credit_limit"
+                    value="{{ form_data.credit_limit }}"
+                >
+            </div>
+
+            <button
+                type="submit"
+                class="btn btn-primary"
+            >
+                顧客を登録
+            </button>
+        </form>
+
+    </div>
+</section>
 
 {% endblock %}

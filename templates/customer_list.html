@@ -6,29 +6,101 @@
 
 {% block content %}
 
-    <h1>顧客一覧</h1>
+<section class="page-header">
+    <p class="page-eyebrow">
+        Customers
+    </p>
 
-    <p>登録されている顧客データを一覧表示しています。</p>
+    <h1>
+        顧客一覧
+    </h1>
 
-    <table>
-        <thead>
-            <tr>
-                <th>顧客ID</th>
-                <th>顧客名</th>
-                <th>貸付上限額</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for customer in customers %}
-            <tr>
-                <td>{{ customer.customer_id }}</td>
-                <td>{{ customer.customer_name }}</td>
-                <td>
-                    {{ "{:,}".format(customer.credit_limit | int) }} 円
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <p class="page-lead">
+        登録されている顧客情報と、
+        顧客ごとの貸付上限額を確認できます。
+    </p>
+
+    <div class="action-group">
+        <a
+            href="{{ url_for('new_customer') }}"
+            class="btn btn-primary"
+        >
+            顧客を新規登録
+        </a>
+
+        <a
+            href="{{ url_for('home') }}"
+            class="btn btn-secondary"
+        >
+            トップへ戻る
+        </a>
+    </div>
+</section>
+
+<section class="section-block">
+    <div class="section-heading">
+        <h2>
+            登録顧客
+        </h2>
+
+        <p>
+            顧客ID・顧客名・貸付上限額を一覧で確認できます。
+        </p>
+    </div>
+
+    {% if customers %}
+        <div class="table-container">
+            <table>
+                <thead>
+                    <tr>
+                        <th>顧客ID</th>
+                        <th>顧客名</th>
+                        <th class="table-number">
+                            貸付上限額
+                        </th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for customer in customers %}
+                    <tr>
+                        <td>
+                            {{ customer.customer_id }}
+                        </td>
+
+                        <td>
+                            <strong>
+                                {{ customer.customer_name }}
+                            </strong>
+                        </td>
+
+                        <td class="table-number">
+                            {{ "{:,}".format(customer.credit_limit | int) }} 円
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="empty-state">
+            <h3>
+                登録されている顧客はいません
+            </h3>
+
+            <p>
+                顧客を登録すると、
+                ここに顧客情報が表示されます。
+            </p>
+
+            <a
+                href="{{ url_for('new_customer') }}"
+                class="btn btn-primary"
+            >
+                最初の顧客を登録
+            </a>
+        </div>
+    {% endif %}
+</section>
 
 {% endblock %}

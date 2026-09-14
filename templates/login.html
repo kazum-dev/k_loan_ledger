@@ -6,45 +6,68 @@
 
 {% block content %}
 
-    <h1>K's Loan Ledger</h1>
-    <h2>ログイン</h2>
+<section class="login-section">
+    <div class="card login-card">
+        <p class="page-eyebrow">
+            K's Loan Ledger
+        </p>
 
-    {% if error %}
-        <div class="message-error">
-            <p>{{ error }}</p>
-        </div>
-    {% endif %}
-
-    <form method="POST" action="{{ url_for('login') }}">
-        <div>
-            <label for="username">ユーザー名</label>
-
-            <input
-                type="text"
-                id="username"
-                name="username"
-                value="{{ username }}"
-                autocomplete="username"
-                required
-                autofocus
-            >
-        </div>
-
-        <div>
-            <label for="password">パスワード</label>
-
-            <input
-                type="password"
-                id="password"
-                name="password"
-                autocomplete="current-password"
-                required
-            >
-        </div>
-
-        <button type="submit" class="btn btn-primary">
+        <h1>
             ログイン
-        </button>
-    </form>
+        </h1>
+
+        <p class="login-description">
+            アカウント情報を入力してログインしてください。
+        </p>
+
+        {% if error %}
+            <div class="message-error">
+                <p>{{ error }}</p>
+            </div>
+        {% endif %}
+
+        <form
+            method="POST"
+            action="{{ url_for('login') }}"
+        >
+            <div>
+                <label for="username">
+                    ユーザー名
+                </label>
+
+                <input
+                    type="text"
+                    id="username"
+                    name="username"
+                    value="{{ username }}"
+                    autocomplete="username"
+                    required
+                    autofocus
+                >
+            </div>
+
+            <div>
+                <label for="password">
+                    パスワード
+                </label>
+
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    autocomplete="current-password"
+                    required
+                >
+            </div>
+
+            <button
+                type="submit"
+                class="btn btn-primary"
+            >
+                ログイン
+            </button>
+        </form>
+    </div>
+</section>
 
 {% endblock %}
