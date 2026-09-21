@@ -590,7 +590,12 @@ def test_create_late_fee_repayment_when_not_overdue(
     client,
     user,
 ):
+    from datetime import date, timedelta
     from app import Customer, Loan, Repayment, db, now_str
+
+    today = date.today()
+    loan_date = today - timedelta(days=30)
+    due_date = today + timedelta(days=30)
 
     with app.app_context():
         customer = Customer(
@@ -606,8 +611,8 @@ def test_create_late_fee_repayment_when_not_overdue(
             user_id=user["user_id"],
             customer_id="CUST-LATE-NOT-OVERDUE",
             loan_amount=100000,
-            loan_date="2026-08-01",
-            due_date="2026-09-30",
+            loan_date=loan_date.strftime("%Y-%m-%d"),
+            due_date=due_date.strftime("%Y-%m-%d"),
             interest_rate_percent=10.0,
             repayment_expected=110000,
             repayment_method="一括",
@@ -638,7 +643,7 @@ def test_create_late_fee_repayment_when_not_overdue(
         data={
             "loan_id": "L20260831-LATE-NOT-OVERDUE",
             "repayment_amount": "1000",
-            "repayment_date": "2026-08-31",
+            "repayment_date": today.strftime("%Y-%m-%d"),
             "payment_type": "LATE_FEE",
         },
     )
@@ -659,7 +664,12 @@ def test_create_late_fee_repayment_over_remaining(
     client,
     user,
 ):
+    from datetime import date, timedelta
     from app import Customer, Loan, Repayment, db, now_str
+
+    today = date.today()
+    loan_date = today - timedelta(days=60)
+    due_date = today - timedelta(days=30)
 
     with app.app_context():
         customer = Customer(
@@ -675,8 +685,8 @@ def test_create_late_fee_repayment_over_remaining(
             user_id=user["user_id"],
             customer_id="CUST-LATE-OVER",
             loan_amount=100000,
-            loan_date="2026-07-01",
-            due_date="2026-07-31",
+            loan_date=loan_date.strftime("%Y-%m-%d"),
+            due_date=due_date.strftime("%Y-%m-%d"),
             interest_rate_percent=10.0,
             repayment_expected=110000,
             repayment_method="一括",
@@ -707,7 +717,7 @@ def test_create_late_fee_repayment_over_remaining(
         data={
             "loan_id": "L20260831-LATE-OVER",
             "repayment_amount": "10000",
-            "repayment_date": "2026-08-31",
+            "repayment_date": today.strftime("%Y-%m-%d"),
             "payment_type": "LATE_FEE",
         },
     )
