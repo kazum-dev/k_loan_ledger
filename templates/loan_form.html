@@ -46,14 +46,16 @@
             </div>
         {% endif %}
 
-        <form method="POST" novalidate>
+        <form method="POST">
             <div>
-                <label>
+                <label for="customer_id">
                     顧客ID
+                    <span class="required-label">必須</span>
                 </label>
 
                 <input
                     type="text"
+                    id="customer_id"
                     name="customer_id"
                     value="{{ form_data.get('customer_id', '') }}"
                     required
@@ -61,25 +63,31 @@
             </div>
 
             <div>
-                <label>
+                <label for="loan_amount">
                     貸付額（円）
+                    <span class="required-label">必須</span>
                 </label>
 
                 <input
                     type="number"
+                    id="loan_amount"
                     name="loan_amount"
                     value="{{ form_data.get('loan_amount', '') }}"
+                    min="1"
+                    step="1"
                     required
                 >
             </div>
 
             <div>
-                <label>
+                <label for="loan_date">
                     貸付日
+                    <span class="required-label">必須</span>
                 </label>
 
                 <input
                     type="date"
+                    id="loan_date"
                     name="loan_date"
                     value="{{ form_data.get('loan_date', '') }}"
                     required
@@ -87,12 +95,14 @@
             </div>
 
             <div>
-                <label>
+                <label for="due_date">
                     返済期日
+                    <span class="required-label">必須</span>
                 </label>
 
                 <input
                     type="date"
+                    id="due_date"
                     name="due_date"
                     value="{{ form_data.get('due_date', '') }}"
                     required
@@ -100,25 +110,31 @@
             </div>
 
             <div>
-                <label>
+                <label for="interest_rate_percent">
                     通常利率（%）
+                    <span class="required-label">必須</span>
                 </label>
 
                 <input
                     type="number"
-                    step="0.1"
+                    id="interest_rate_percent"
                     name="interest_rate_percent"
                     value="{{ form_data.get('interest_rate_percent', '10.0') }}"
+                    min="0"
+                    step="0.1"
                     required
                 >
             </div>
 
             <div>
-                <label>
+                <label for="repayment_method">
                     返済方法
                 </label>
 
-                <select name="repayment_method">
+                <select
+                    id="repayment_method"
+                    name="repayment_method"
+                >
                     <option
                         value="CASH"
                         {% if form_data.get('repayment_method') == 'CASH' %}selected{% endif %}
@@ -143,39 +159,47 @@
             </div>
 
             <div>
-                <label>
+                <label for="grace_period_days">
                     延滞猶予日数（日）
+                    <span class="required-label">必須</span>
                 </label>
 
                 <input
                     type="number"
+                    id="grace_period_days"
                     name="grace_period_days"
                     value="{{ form_data.get('grace_period_days', '0') }}"
+                    min="0"
+                    step="1"
                     required
                 >
             </div>
 
             <div>
-                <label>
+                <label for="late_fee_rate_percent">
                     延滞利率（%）
+                    <span class="required-label">必須</span>
                 </label>
 
                 <input
                     type="number"
-                    step="0.1"
+                    id="late_fee_rate_percent"
                     name="late_fee_rate_percent"
                     value="{{ form_data.get('late_fee_rate_percent', '10.0') }}"
+                    min="0"
+                    step="0.1"
                     required
                 >
             </div>
 
             <div>
-                <label>
+                <label for="notes">
                     備考
                 </label>
 
                 <input
                     type="text"
+                    id="notes"
                     name="notes"
                     value="{{ form_data.get('notes', '') }}"
                 >

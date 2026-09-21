@@ -50,6 +50,7 @@
             <div>
                 <label for="customer_id">
                     顧客ID
+                    <span class="required-label">必須</span>
                 </label>
 
                 <input
@@ -57,12 +58,14 @@
                     id="customer_id"
                     name="customer_id"
                     value="{{ form_data.customer_id }}"
+                    required
                 >
             </div>
 
             <div>
                 <label for="customer_name">
                     顧客名
+                    <span class="required-label">必須</span>
                 </label>
 
                 <input
@@ -70,19 +73,24 @@
                     id="customer_name"
                     name="customer_name"
                     value="{{ form_data.customer_name }}"
+                    required
                 >
             </div>
 
             <div>
                 <label for="credit_limit">
                     貸付上限額（円）
+                    <span class="required-label">必須</span>
                 </label>
 
                 <input
-                    type="text"
+                    type="number"
                     id="credit_limit"
                     name="credit_limit"
                     value="{{ form_data.credit_limit }}"
+                    min="1"
+                    step="1"
+                    required
                 >
             </div>
 

@@ -186,6 +186,19 @@ label {
     font-weight: 600;
 }
 
+.required-label {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.1rem 0.35rem;
+    border-radius: var(--radius-sm);
+    background: #fef2f2;
+    color: var(--color-danger);
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.4;
+    vertical-align: middle;
+}
+
 form > div,
 form > p {
     margin-bottom: var(--space-md);

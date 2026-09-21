@@ -50,6 +50,7 @@
             <div>
                 <label for="loan_id">
                     貸付ID
+                    <span class="required-label">必須</span>
                 </label>
 
                 <input
@@ -57,18 +58,21 @@
                     id="loan_id"
                     name="loan_id"
                     value="{{ form_data.get('loan_id', '') }}"
+                    required
                 >
             </div>
 
             <div>
                 <label for="cancel_reason">
                     契約解除理由
+                    <span class="required-label">必須</span>
                 </label>
 
                 <textarea
                     id="cancel_reason"
                     name="cancel_reason"
                     rows="4"
+                    required
                 >{{ form_data.get('cancel_reason', '') }}</textarea>
             </div>
 
