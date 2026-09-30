@@ -252,6 +252,52 @@ data/loan_ledger.db
 
 ---
 
+## データベースマイグレーション
+
+データベースのスキーマ変更は Flask-Migrate / Alembic で管理します。
+
+SQLAlchemy のモデルを変更した場合は、まずマイグレーションファイルを生成します。
+
+```powershell
+python -m flask --app app db migrate -m "変更内容"
+```
+
+生成された `migrations/versions/` 内のファイルを確認した後、データベースへ適用します。
+
+```powershell
+python -m flask --app app db upgrade
+```
+
+現在のマイグレーション位置は以下で確認できます。
+
+```powershell
+python -m flask --app app db current
+```
+
+マイグレーション履歴は以下で確認できます。
+
+```powershell
+python -m flask --app app db history
+```
+
+基本的な流れは以下です。
+
+```text
+SQLAlchemyモデルを変更
+        ↓
+db migrate
+        ↓
+生成されたマイグレーションファイルを確認
+        ↓
+db upgrade
+        ↓
+pytestで既存機能を確認
+```
+
+`db migrate` はマイグレーションファイルを生成する処理であり、データベースへ変更を適用する処理ではありません。
+
+既存データベースに対する `stamp` や、本番データベースへのマイグレーション適用は、スキーマとバックアップを確認した上で慎重に行います。
+
 ## ローカル起動方法
 
 ### 1. リポジトリを取得
@@ -301,15 +347,27 @@ $env:SECRET_KEY="your_secret_key"
 
 実際の秘密情報はリポジトリへコミットしないでください。
 
-### 6. データベースを初期化
+### 6. データベースをマイグレーション
+
+Flask-Migrate / Alembic を使用して、データベースを最新のスキーマへ更新します。
+
+```powershell
+python -m flask --app app db upgrade
+```
+
+新規環境では、マイグレーション履歴に基づいて必要なテーブルが作成されます。
+
+### 7. 初期ユーザーを作成
+
+`INITIAL_USERNAME` と `INITIAL_PASSWORD` が設定されている場合は、以下を実行して初期ユーザーを作成します。
 
 ```powershell
 python init_db.py
 ```
 
-SQLite のテーブルが作成され、初期ユーザー用の環境変数が設定されている場合はユーザーも作成されます。
+`init_db.py` はデータベースのスキーマ作成には使用せず、初期ユーザーの登録に使用します。
 
-### 7. アプリケーションを起動
+### 8. アプリケーションを起動
 
 ```powershell
 python app.py

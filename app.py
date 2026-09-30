@@ -12,6 +12,7 @@ from flask import (
     session,
     url_for,
 )
+from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash
@@ -56,6 +57,7 @@ else:
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
 class User(db.Model):
     __tablename__ = "users"

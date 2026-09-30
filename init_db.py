@@ -58,9 +58,6 @@ def create_initial_user() -> None:
 
 def main() -> None:
     with app.app_context():
-        db.create_all()
-        print("データベースのテーブルを確認・作成しました。")
-
         create_initial_user()
 
 
