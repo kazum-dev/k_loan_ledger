@@ -47,6 +47,8 @@
         {% endif %}
 
         <form method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            
             <div>
                 <label for="customer_id">
                     顧客ID

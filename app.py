@@ -1,5 +1,6 @@
 # app.py
 import os
+import logging
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from flask import (
 )
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
+from flask_wtf.csrf import CSRFProtect
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash
 
@@ -44,20 +46,42 @@ if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
 
 app = Flask(__name__)
 
-app.config["SECRET_KEY"] = os.environ.get(
-    "SECRET_KEY",
-    "development-secret-key-change-before-production",
+APP_ENV = os.environ.get(
+    "APP_ENV",
+    "development",
+).strip().lower()
+
+SECRET_KEY = os.environ.get("SECRET_KEY")
+
+if APP_ENV == "production" and not SECRET_KEY:
+    raise RuntimeError(
+        "SECRET_KEY must be set in production."
+    )
+
+app.config["SECRET_KEY"] = (
+    SECRET_KEY
+    or "development-secret-key-change-before-production"
 )
 
+app.config["SESSION_COOKIE_SECURE"] = APP_ENV == "production"
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
 if DATABASE_URL:
+
     app.config["SQLALCHEMY_DATABASE_URI"] = DATABASE_URL
 else:
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
 
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+app.logger.setLevel(
+    logging.INFO
+)
+
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
+csrf = CSRFProtect(app)
 
 class User(db.Model):
     __tablename__ = "users"
@@ -174,8 +198,15 @@ def commit_db_changes():
     """
     try:
         db.session.commit()
-    except SQLAlchemyError:
+
+    except SQLAlchemyError as error:
         db.session.rollback()
+
+        app.logger.error(
+            "Database commit failed: %s",
+            type(error).__name__,
+        )
+
         raise
     
 @app.before_request
@@ -598,11 +629,20 @@ def get_contract_status_label(contract_status):
 def not_found_error(error):
     return "ページが見つかりません。", 404
 
-
 @app.errorhandler(500)
 def internal_server_error(error):
     db.session.rollback()
-    return "サーバー内部でエラーが発生しました。時間をおいて再度お試しください。", 500
+
+    app.logger.error(
+        "Internal server error: %s",
+        type(error).__name__,
+    )
+
+    return (
+        "サーバー内部でエラーが発生しました。"
+        "時間をおいて再度お試しください。",
+        500,
+    )
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -627,6 +667,10 @@ def login():
         )
 
         if authentication_failed:
+            app.logger.warning(
+                "Login failed"
+            )
+
             error = (
                 "ユーザー名またはパスワードが"
                 "正しくありません。"
@@ -634,6 +678,11 @@ def login():
         else:
             session.clear()
             session["user_id"] = user.user_id
+
+            app.logger.info(
+                "Login succeeded: user_id=%s",
+                user.user_id,
+            )
 
             return redirect(url_for("home"))
 
@@ -645,7 +694,15 @@ def login():
 
 @app.route("/logout", methods=["POST"])
 def logout():
+    user_id = session.get("user_id")
+
     session.clear()
+
+    app.logger.info(
+        "Logout: user_id=%s",
+        user_id,
+    )
+
     return redirect(url_for("login"))
 
 @app.route("/")

@@ -194,3 +194,195 @@ def test_repayment_visibility_is_separated_by_user(
 
     assert response.status_code == 200
     assert b"L20260831-002" not in response.data
+
+def test_cannot_repay_another_users_loan(
+    app,
+    client,
+    user_a,
+    user_b,
+):
+    from app import Customer, Loan, Repayment, db, now_str
+
+    with app.app_context():
+        customer = Customer(
+            customer_id="CUST-A-AUTH-001",
+            user_id=user_a["user_id"],
+            customer_name="ユーザーAの認可テスト顧客",
+            credit_limit=300000,
+            created_at=now_str(),
+        )
+
+        loan = Loan(
+            loan_id="L-A-AUTH-001",
+            user_id=user_a["user_id"],
+            customer_id="CUST-A-AUTH-001",
+            loan_amount=100000,
+            loan_date="2026-08-01",
+            due_date="2026-12-31",
+            interest_rate_percent=10.0,
+            repayment_expected=110000,
+            repayment_method="一括",
+            grace_period_days=0,
+            late_fee_rate_percent=5.0,
+            late_base_amount=100000,
+            contract_status="ACTIVE",
+            cancelled_at=None,
+            cancel_reason=None,
+            notes="authorization test",
+            created_at=now_str(),
+        )
+
+        db.session.add(customer)
+        db.session.add(loan)
+        db.session.commit()
+
+    client.post(
+        "/login",
+        data={
+            "username": user_b["username"],
+            "password": user_b["password"],
+        },
+    )
+
+    response = client.post(
+        "/repayments/new",
+        data={
+            "loan_id": "L-A-AUTH-001",
+            "repayment_amount": "10000",
+            "repayment_date": "2026-10-12",
+            "payment_type": "REPAYMENT",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "存在しない loan_id です。".encode("utf-8") in response.data
+
+    with app.app_context():
+        repayment = Repayment.query.filter_by(
+            loan_id="L-A-AUTH-001",
+        ).first()
+
+        assert repayment is None
+
+
+def test_cannot_cancel_another_users_loan(
+    app,
+    client,
+    user_a,
+    user_b,
+):
+    from app import Customer, Loan, db, now_str
+
+    with app.app_context():
+        customer = Customer(
+            customer_id="CUST-A-AUTH-002",
+            user_id=user_a["user_id"],
+            customer_name="ユーザーAの契約解除認可テスト顧客",
+            credit_limit=300000,
+            created_at=now_str(),
+        )
+
+        loan = Loan(
+            loan_id="L-A-AUTH-002",
+            user_id=user_a["user_id"],
+            customer_id="CUST-A-AUTH-002",
+            loan_amount=100000,
+            loan_date="2026-08-01",
+            due_date="2026-12-31",
+            interest_rate_percent=10.0,
+            repayment_expected=110000,
+            repayment_method="一括",
+            grace_period_days=0,
+            late_fee_rate_percent=5.0,
+            late_base_amount=100000,
+            contract_status="ACTIVE",
+            cancelled_at=None,
+            cancel_reason=None,
+            notes="authorization test",
+            created_at=now_str(),
+        )
+
+        db.session.add(customer)
+        db.session.add(loan)
+        db.session.commit()
+
+    client.post(
+        "/login",
+        data={
+            "username": user_b["username"],
+            "password": user_b["password"],
+        },
+    )
+
+    response = client.post(
+        "/loans/cancel",
+        data={
+            "loan_id": "L-A-AUTH-002",
+            "cancel_reason": "越権操作テスト",
+        },
+    )
+
+    assert response.status_code == 200
+    assert "存在しない貸付IDです。".encode("utf-8") in response.data
+
+    with app.app_context():
+        loan = db.session.get(
+            Loan,
+            "L-A-AUTH-002",
+        )
+
+        assert loan.contract_status == "ACTIVE"
+        assert loan.cancelled_at is None
+
+def test_cannot_create_loan_for_another_users_customer(
+    app,
+    client,
+    user_a,
+    user_b,
+):
+    from app import Customer, Loan, db, now_str
+
+    with app.app_context():
+        customer = Customer(
+            customer_id="CUST-A-AUTH-003",
+            user_id=user_a["user_id"],
+            customer_name="ユーザーAの貸付作成認可テスト顧客",
+            credit_limit=300000,
+            created_at=now_str(),
+        )
+
+        db.session.add(customer)
+        db.session.commit()
+
+    client.post(
+        "/login",
+        data={
+            "username": user_b["username"],
+            "password": user_b["password"],
+        },
+    )
+
+    response = client.post(
+        "/loans/new",
+        data={
+            "customer_id": "CUST-A-AUTH-003",
+            "loan_amount": "100000",
+            "loan_date": "2026-10-12",
+            "due_date": "2026-12-31",
+            "interest_rate_percent": "10",
+            "repayment_method": "一括",
+            "grace_period_days": "0",
+            "late_fee_rate_percent": "5",
+            "notes": "越権操作テスト",
+        },
+    )
+
+    assert response.status_code == 200
+
+    with app.app_context():
+        loan = Loan.query.filter_by(
+            customer_id="CUST-A-AUTH-003",
+            user_id=user_b["user_id"],
+        ).first()
+
+        assert loan is None

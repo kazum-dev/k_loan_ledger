@@ -23,6 +23,7 @@ def app(tmp_path, monkeypatch):
     flask_app.config.update(
         TESTING=True,
         SECRET_KEY="test-secret-key",
+        WTF_CSRF_ENABLED=False,
     )
 
     database_uri = flask_app.config["SQLALCHEMY_DATABASE_URI"]
